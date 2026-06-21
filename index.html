@@ -239,10 +239,22 @@
       <div class="fighter player" id="player">
         <div class="figbody">
         <svg viewBox="0 0 200 240" aria-label="player">
-          <!-- balloon sword (gripped at the bottom handle, blade raised up) -->
+          <defs>
+            <linearGradient id="steel" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0" stop-color="#c4ccd6"/>
+              <stop offset=".5" stop-color="#f6f9fc"/>
+              <stop offset="1" stop-color="#919cab"/>
+            </linearGradient>
+          </defs>
+          <!-- sheath (scabbard) worn on the back -->
+          <rect x="44" y="116" width="14" height="82" rx="7" fill="#9775fa" stroke="#34285a" stroke-width="3"
+            transform="rotate(-26 51 157)"/>
+          <!-- steel katana: blade + guard (hilt) + wrapped handle, gripped at the bottom -->
           <g class="swordP">
-            <rect x="137" y="16" width="26" height="134" rx="13" fill="#ff5ba6" stroke="#34285a" stroke-width="4"/>
-            <circle cx="150" cy="158" r="12" fill="#ffd23f" stroke="#34285a" stroke-width="4"/>
+            <path d="M143 144 L143 34 L150 14 L157 34 L157 144 Z" fill="url(#steel)" stroke="#34285a" stroke-width="3" stroke-linejoin="round"/>
+            <line x1="150" y1="28" x2="150" y2="140" stroke="#ffffff" stroke-width="2" opacity=".7"/>
+            <rect x="131" y="143" width="38" height="9" rx="4" fill="#ffd23f" stroke="#34285a" stroke-width="3"/>
+            <rect x="144" y="152" width="12" height="30" rx="5" fill="#7b4b2a" stroke="#34285a" stroke-width="3"/>
           </g>
           <!-- pigtails -->
           <circle cx="55" cy="55" r="20" fill="#7b4b2a" stroke="#34285a" stroke-width="4"/>
@@ -253,14 +265,14 @@
           <circle cx="102" cy="60" r="4.5" fill="#34285a"/>
           <circle cx="70" cy="72" r="6" fill="#ff9ec4" opacity=".7"/>
           <circle cx="110" cy="72" r="6" fill="#ff9ec4" opacity=".7"/>
-          <path d="M76 74 q14 14 28 0" fill="none" stroke="#34285a" stroke-width="4" stroke-linecap="round"/>
+          <path class="mouth" d="M76 74 q14 14 28 0" fill="none" stroke="#34285a" stroke-width="4" stroke-linecap="round"/>
           <!-- bow -->
           <path d="M90 28 l-12 -10 v20 z" fill="#ff5ba6" stroke="#34285a" stroke-width="3"/>
           <path d="M90 28 l12 -10 v20 z" fill="#ff5ba6" stroke="#34285a" stroke-width="3"/>
           <!-- body / dress -->
           <path d="M90 94 L60 180 L120 180 Z" fill="#ff8ec9" stroke="#34285a" stroke-width="5" stroke-linejoin="round"/>
-          <!-- arms (sword hand grips the handle at the bottom of the blade) -->
-          <path d="M90 120 L150 152" fill="none" stroke="#34285a" stroke-width="6" stroke-linecap="round"/>
+          <!-- arms (sword hand grips the wrapped handle) -->
+          <path d="M90 120 L150 164" fill="none" stroke="#34285a" stroke-width="6" stroke-linecap="round"/>
           <path d="M90 120 L48 140" fill="none" stroke="#34285a" stroke-width="6" stroke-linecap="round"/>
           <!-- legs -->
           <path d="M80 180 L72 220" stroke="#34285a" stroke-width="6" stroke-linecap="round"/>
@@ -273,9 +285,15 @@
       <div class="fighter opponent" id="opponent">
         <div class="figbody">
         <svg viewBox="0 0 200 240" aria-label="opponent">
+          <!-- sheath (scabbard) worn on the back -->
+          <rect x="142" y="116" width="14" height="82" rx="7" fill="#74c0fc" stroke="#34285a" stroke-width="3"
+            transform="rotate(26 149 157)"/>
+          <!-- steel katana -->
           <g class="swordO">
-            <rect x="37" y="16" width="26" height="134" rx="13" fill="#4cc9ff" stroke="#34285a" stroke-width="4"/>
-            <circle cx="50" cy="158" r="12" fill="#51e3a0" stroke="#34285a" stroke-width="4"/>
+            <path d="M43 144 L43 34 L50 14 L57 34 L57 144 Z" fill="url(#steel)" stroke="#34285a" stroke-width="3" stroke-linejoin="round"/>
+            <line x1="50" y1="28" x2="50" y2="140" stroke="#ffffff" stroke-width="2" opacity=".7"/>
+            <rect x="31" y="143" width="38" height="9" rx="4" fill="#b197fc" stroke="#34285a" stroke-width="3"/>
+            <rect x="44" y="152" width="12" height="30" rx="5" fill="#3b5bdb" stroke="#34285a" stroke-width="3"/>
           </g>
           <!-- headband -->
           <path d="M76 36 q34 -16 68 0" fill="none" stroke="#7048e8" stroke-width="8" stroke-linecap="round"/>
@@ -283,11 +301,11 @@
           <circle cx="110" cy="60" r="34" fill="#d8f5a2" stroke="#34285a" stroke-width="5"/>
           <circle cx="98" cy="60" r="4.5" fill="#34285a"/>
           <circle cx="122" cy="60" r="4.5" fill="#34285a"/>
-          <path d="M98 80 q12 8 24 0" fill="none" stroke="#34285a" stroke-width="4" stroke-linecap="round"/>
+          <path class="mouth" d="M98 80 q12 8 24 0" fill="none" stroke="#34285a" stroke-width="4" stroke-linecap="round"/>
           <!-- body -->
           <rect x="92" y="94" width="36" height="80" rx="14" fill="#74c0fc" stroke="#34285a" stroke-width="5"/>
-          <!-- arms (sword hand grips the handle at the bottom of the blade) -->
-          <path d="M110 120 L50 152" fill="none" stroke="#34285a" stroke-width="6" stroke-linecap="round"/>
+          <!-- arms (sword hand grips the wrapped handle) -->
+          <path d="M110 120 L50 164" fill="none" stroke="#34285a" stroke-width="6" stroke-linecap="round"/>
           <path d="M110 120 L150 140" fill="none" stroke="#34285a" stroke-width="6" stroke-linecap="round"/>
           <!-- legs -->
           <path d="M100 174 L92 220" stroke="#34285a" stroke-width="6" stroke-linecap="round"/>
@@ -708,14 +726,24 @@ function onCoach(msg){
   });
 }
 
-/* ---- Trophies & stickers ---- */
-const TROPHIES = [
-  {name:"Rainbow",  icon:"🌈"},
-  {name:"Princess", icon:"👑"},
-  {name:"Dragon",   icon:"🐉"},
-  {name:"Kitten",   icon:"🐱"},
-  {name:"Heart",    icon:"💖"},
-  {name:"Star",     icon:"⭐"},
+/* ---- Prizes (trophies + fair foods) & stickers ---- */
+const REWARDS = [
+  // trophies (shown with a 🏆 cup)
+  {name:"Rainbow",  icon:"🌈", cup:true},
+  {name:"Princess", icon:"👑", cup:true},
+  {name:"Dragon",   icon:"🐉", cup:true},
+  {name:"Kitten",   icon:"🐱", cup:true},
+  {name:"Heart",    icon:"💖", cup:true},
+  {name:"Star",     icon:"⭐", cup:true},
+  // fair foods (treats)
+  {name:"Cupcake",      icon:"🧁"},
+  {name:"Cotton Candy", icon:"🍬"},
+  {name:"Cake",         icon:"🍰"},
+  {name:"Ice Cream",    icon:"🍦"},
+  {name:"Lollipop",     icon:"🍭"},
+  {name:"Donut",        icon:"🍩"},
+  {name:"Popcorn",      icon:"🍿"},
+  {name:"Pretzel",      icon:"🥨"},
 ];
 
 /* The opponent is pushed behind the finish line: topple + trophy screen. */
@@ -731,31 +759,32 @@ function winBattle(){
 }
 
 function openTrophyScreen(){
-  const pool = TROPHIES.slice().sort(()=>Math.random()-0.5).slice(0,3);
+  if(ui.luTitle) ui.luTitle.innerHTML = "YOU WON THE BATTLE!<br>PICK YOUR PRIZE!";
+  const pool = REWARDS.slice().sort(()=>Math.random()-0.5).slice(0,3);
   ui.trophyRow.innerHTML = "";
   ui.trophyReward.textContent = "";
   ui.levelContinue.classList.add("hidden");
-  pool.forEach(tr=>{
+  pool.forEach(rw=>{
     const b=document.createElement("button");
     b.className="trophy-btn";
-    b.innerHTML = `${tr.icon}🏆<span class="lbl">${tr.name}</span>`;
-    b.onclick=()=>chooseTrophy(tr, b);
+    b.innerHTML = `${rw.icon}${rw.cup?"🏆":""}<span class="lbl">${rw.name}</span>`;
+    b.onclick=()=>chooseReward(rw, b);
     ui.trophyRow.appendChild(b);
   });
   ui.levelup.classList.remove("hidden");
   rainbowBurst();
-  speak("You win! Pick your trophy!");
+  speak("You win! Pick your prize!");
 }
 
-function chooseTrophy(tr, btn){
+function chooseReward(rw, btn){
   [...ui.trophyRow.children].forEach(c=>{ if(c!==btn) c.classList.add("dim"); });
   btn.classList.add("chosen");
-  // exactly ONE sticker — only the trophy she chose
-  state.stickers.push(tr.icon);
+  // exactly ONE sticker — only the prize she chose
+  state.stickers.push(rw.icon);
   saveProgress();
   renderStickers(1);
   rainbowBurst();
-  ui.trophyReward.textContent = "You earned " + tr.icon;
+  ui.trophyReward.textContent = "You earned " + rw.icon;
   ui.levelContinue.classList.remove("hidden");
   speak("Yay! A new sticker for your collection!");
 }
@@ -810,16 +839,19 @@ function confetti(n){
   for(let i=0;i<n;i++){
     const c=document.createElement("div"); c.className="confetti";
     c.style.background=COLORS[i%COLORS.length];
-    c.style.left=(50+(Math.random()*40-20))+"%";
-    c.style.top="40%";
-    const dx=(Math.random()*2-1)*240, dy=-(140+Math.random()*220), rot=Math.random()*720;
-    // slower fall so a 5-year-old can actually watch it settle
+    // start spread across the upper part of the stage (not one line)
+    c.style.left=(6+Math.random()*88)+"%";
+    c.style.top=(4+Math.random()*40)+"%";
+    const dx=(Math.random()*2-1)*90;        // gentle sideways drift
+    const dy=160+Math.random()*230;         // fall DOWN the screen
+    const rot=Math.random()*720-360;
     c.animate([
-      {transform:"translate(0,0) rotate(0)", opacity:1},
-      {transform:`translate(${dx}px,${dy}px) rotate(${rot}deg)`, opacity:1, offset:.55},
-      {transform:`translate(${dx*1.2}px,${dy+320}px) rotate(${rot}deg)`, opacity:0}
-    ], {duration:2600+Math.random()*800, easing:"cubic-bezier(.2,.7,.3,1)"});
-    ui.fx.appendChild(c); setTimeout(()=>c.remove(),3500);
+      {transform:"translate(0,-12px) rotate(0)", opacity:0},
+      {transform:`translate(${dx*0.4}px,${dy*0.3}px) rotate(${rot*0.4}deg)`, opacity:1, offset:.15},
+      {transform:`translate(${dx}px,${dy}px) rotate(${rot}deg)`, opacity:1, offset:.82},
+      {transform:`translate(${dx*1.1}px,${dy+40}px) rotate(${rot}deg)`, opacity:0}
+    ], {duration:2600+Math.random()*1100, easing:"cubic-bezier(.25,.5,.4,1)"});
+    ui.fx.appendChild(c); setTimeout(()=>c.remove(),3900);
   }
 }
 function stars(n){
@@ -878,14 +910,28 @@ function clash(winner){
   [charger,victim].forEach(el=>el.classList.remove("charge","knock"));
   void charger.offsetWidth;
   charger.classList.add("charge");
-  victim.classList.add("knock");
-  // strike + impact land at the clash moment (~40% of the .9s charge)
+  // 1) the sword swings first
+  setTimeout(()=> swing(sword, ""), 260);
+  // 2) the blade connects on the downswing — THEN the strike lands on the victim
   setTimeout(()=>{
-    swing(sword, "");
+    victim.classList.add("knock");
+    hurtFace(victim);
     boom(g.front, 42);
     if(winner==="player"){ sndSuccess(); comicHits(g.front); }
     else { sndThud(); }
-  }, 330);
+  }, 470);
+}
+
+/* When a fighter is struck, switch their smile to a frown for a moment. */
+const SMILE = { player:"M76 74 q14 14 28 0",  opponent:"M98 80 q12 8 24 0" };
+const FROWN = { player:"M76 84 q14 -14 28 0", opponent:"M98 88 q12 -12 24 0" };
+function hurtFace(victimEl){
+  const who = (victimEl === ui.player) ? "player" : "opponent";
+  const mouth = victimEl.querySelector(".mouth");
+  if(!mouth) return;
+  mouth.setAttribute("d", FROWN[who]);
+  clearTimeout(mouth._t);
+  mouth._t = setTimeout(()=> mouth.setAttribute("d", SMILE[who]), 1200);
 }
 
 /* ---- WebAudio cute sounds ---- */
