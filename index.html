@@ -61,7 +61,7 @@
   .fighter.player{ left:var(--pLeft); transition:left .5s cubic-bezier(.5,1.4,.4,1); }
   .fighter.opponent{ left:var(--oLeft); transition:left .5s cubic-bezier(.5,1.4,.4,1); }
   .fighter.charge{ z-index:3; }
-  .fighter svg{ width:100%; height:auto; display:block; }
+  .fighter svg{ width:100%; height:auto; display:block; overflow:visible; }
   /* the body wrapper carries the attack motion, independent of placement */
   .figbody{ transform-origin:bottom center; }
 
@@ -81,11 +81,12 @@
   .swordO.swing{ animation:swingO .6s ease-in-out 3; }
   .swordP,.swordO{ transform-box:fill-box; transform-origin:bottom center; }
 
-  /* CLASH: step forward into the clash line, then back */
-  @keyframes chargeP{ 0%{transform:translateX(0)} 42%{transform:translateX(46%)}
-    54%{transform:translateX(38%)} 100%{transform:translateX(0)} }
-  @keyframes chargeO{ 0%{transform:translateX(0)} 42%{transform:translateX(-46%)}
-    54%{transform:translateX(-38%)} 100%{transform:translateX(0)} }
+  /* CLASH: a small step forward toward the clash line, then back. Kept short so
+     the winner stays on its own side and is clearly the one swinging. */
+  @keyframes chargeP{ 0%{transform:translateX(0)} 42%{transform:translateX(22%)}
+    54%{transform:translateX(16%)} 100%{transform:translateX(0)} }
+  @keyframes chargeO{ 0%{transform:translateX(0)} 42%{transform:translateX(-22%)}
+    54%{transform:translateX(-16%)} 100%{transform:translateX(0)} }
   /* KNOCKBACK: stumble + wobble when struck (opponent), tiny step back (player) */
   @keyframes knockO{ 0%{transform:translateX(0) rotate(0)}
     28%{transform:translateX(34%) rotate(12deg)} 48%{transform:translateX(18%) rotate(-8deg)}
@@ -232,10 +233,10 @@
       <div class="fighter player" id="player">
         <div class="figbody">
         <svg viewBox="0 0 200 240" aria-label="player">
-          <!-- balloon sword -->
+          <!-- balloon sword (gripped at the bottom handle, blade raised up) -->
           <g class="swordP">
-            <rect x="150" y="40" width="26" height="150" rx="13" fill="#ff5ba6" stroke="#34285a" stroke-width="4"/>
-            <circle cx="163" cy="195" r="12" fill="#ffd23f" stroke="#34285a" stroke-width="4"/>
+            <rect x="137" y="16" width="26" height="134" rx="13" fill="#ff5ba6" stroke="#34285a" stroke-width="4"/>
+            <circle cx="150" cy="158" r="12" fill="#ffd23f" stroke="#34285a" stroke-width="4"/>
           </g>
           <!-- pigtails -->
           <circle cx="55" cy="55" r="20" fill="#7b4b2a" stroke="#34285a" stroke-width="4"/>
@@ -252,8 +253,8 @@
           <path d="M90 28 l12 -10 v20 z" fill="#ff5ba6" stroke="#34285a" stroke-width="3"/>
           <!-- body / dress -->
           <path d="M90 94 L60 180 L120 180 Z" fill="#ff8ec9" stroke="#34285a" stroke-width="5" stroke-linejoin="round"/>
-          <!-- arms -->
-          <path d="M90 120 L150 110" fill="none" stroke="#34285a" stroke-width="6" stroke-linecap="round"/>
+          <!-- arms (sword hand grips the handle at the bottom of the blade) -->
+          <path d="M90 120 L150 152" fill="none" stroke="#34285a" stroke-width="6" stroke-linecap="round"/>
           <path d="M90 120 L48 140" fill="none" stroke="#34285a" stroke-width="6" stroke-linecap="round"/>
           <!-- legs -->
           <path d="M80 180 L72 220" stroke="#34285a" stroke-width="6" stroke-linecap="round"/>
@@ -267,8 +268,8 @@
         <div class="figbody">
         <svg viewBox="0 0 200 240" aria-label="opponent">
           <g class="swordO">
-            <rect x="24" y="40" width="26" height="150" rx="13" fill="#4cc9ff" stroke="#34285a" stroke-width="4"/>
-            <circle cx="37" cy="195" r="12" fill="#51e3a0" stroke="#34285a" stroke-width="4"/>
+            <rect x="37" y="16" width="26" height="134" rx="13" fill="#4cc9ff" stroke="#34285a" stroke-width="4"/>
+            <circle cx="50" cy="158" r="12" fill="#51e3a0" stroke="#34285a" stroke-width="4"/>
           </g>
           <!-- headband -->
           <path d="M76 36 q34 -16 68 0" fill="none" stroke="#7048e8" stroke-width="8" stroke-linecap="round"/>
@@ -279,8 +280,8 @@
           <path d="M98 80 q12 8 24 0" fill="none" stroke="#34285a" stroke-width="4" stroke-linecap="round"/>
           <!-- body -->
           <rect x="92" y="94" width="36" height="80" rx="14" fill="#74c0fc" stroke="#34285a" stroke-width="5"/>
-          <!-- arms -->
-          <path d="M110 120 L50 110" fill="none" stroke="#34285a" stroke-width="6" stroke-linecap="round"/>
+          <!-- arms (sword hand grips the handle at the bottom of the blade) -->
+          <path d="M110 120 L50 152" fill="none" stroke="#34285a" stroke-width="6" stroke-linecap="round"/>
           <path d="M110 120 L150 140" fill="none" stroke="#34285a" stroke-width="6" stroke-linecap="round"/>
           <!-- legs -->
           <path d="M100 174 L92 220" stroke="#34285a" stroke-width="6" stroke-linecap="round"/>
