@@ -625,29 +625,28 @@ function initRecognition(){
   rec.onresult = (ev)=>{
     if(busy || !shouldListen) return;
     const res = ev.results[ev.results.length-1];
+    if(!res.isFinal) return;                  // decide on the final result (honest best guess)
     const alts = [];
     for(let i=0;i<res.length;i++) alts.push(res[i].transcript);
 
-    // Favor SUCCESS: if ANY alternative is correct -> win.
-    for(const a of alts){ if(evalTranscript(a)==="correct"){ flashHeard(attemptOnset(a)); onCorrect(); return; } }
+    // Use the recogniser's BEST guess that is an attempt at the target word.
+    // (Previously we scanned EVERY alternative for the target, so the target was
+    //  almost always found even when she said a sibling -> it always highlighted
+    //  and rewarded the target. Now we trust the top matching guess.)
+    let chosen=null, onset=null;
+    for(const a of alts){ const o=attemptOnset(a); if(o!=null){ chosen=a; onset=o; break; } }
 
-    // Only act on FINAL results (avoid premature scolding on interim noise).
-    if(res.isFinal){
-      // a wrong SOUND on the right word -> opponent counter-attacks
-      for(const a of alts){
-        const r = evalTranscript(a);
-        if(r && r.coach){ flashHeard(attemptOnset(a)); onCoach(r.coach); return; }
-      }
-      // otherwise: still highlight whatever it sounded most like (reinforcement),
-      // and remember she tried — but stay silent
-      const hadSpeech = alts.some(a=>/[a-z]/i.test(a));
-      if(hadSpeech){
-        roundAttempts++;
-        let onset=null; for(const a of alts){ const o=attemptOnset(a); if(o){ onset=o; break; } }
-        if(onset){ flashHeard(onset); lastAttemptClose = true; }
-        else if(alts.some(isAttemptClose)) lastAttemptClose = true;
-      }
+    if(onset!=null){
+      flashHeard(onset);                      // highlight what it sounded MOST like
+      const r = evalTranscript(chosen);
+      if(r === "correct"){ onCorrect(); return; }
+      if(r && r.coach){ onCoach(r.coach); return; }
+      // matched the word-shape but not a clean correct/coach (e.g. multi-word partial)
+      roundAttempts++; lastAttemptClose = true;
+      return;
     }
+    // free talk / questions / noise -> ignore (just note for patience)
+    if(alts.some(a=>/[a-z]/i.test(a))) roundAttempts++;
   };
   return true;
 }
@@ -1142,12 +1141,13 @@ function azureListenStart(){
   try{
     azureEnsureRecognizer();
     azureRec.authorizationToken = azureToken;
-    // assess against THIS round's target word (miscue tolerates extra chatter)
+    // UNSCRIPTED assessment: no reference text, so Azure reports the word she
+    // actually said (ship vs sip vs chip) instead of biasing toward the target.
     paConfig = new SpeechSDK.PronunciationAssessmentConfig(
-      target.phrase,
+      "",
       SpeechSDK.PronunciationAssessmentGradingSystem.HundredMark,
       SpeechSDK.PronunciationAssessmentGranularity.Phoneme,
-      /*enableMiscue*/ true);
+      /*enableMiscue*/ false);
     paConfig.phonemeAlphabet = "IPA";
     paConfig.applyTo(azureRec);
     azureRec.startContinuousRecognitionAsync(()=>{}, ()=>{});
