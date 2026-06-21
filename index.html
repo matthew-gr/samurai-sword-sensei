@@ -8,9 +8,10 @@
   :root{
     --pink:#ff6fb5; --pink-soft:#ffd6ec; --blue:#4cc9ff; --yellow:#ffd23f;
     --green:#51e3a0; --purple:#b388ff; --ink:#34285a;
-    /* battle-line resting positions, set by JS from state.pushback */
-    --pLeft:8%;   /* player's resting distance from left wall  */
-    --oRight:26%; /* opponent's resting distance from right wall */
+    /* tug-of-war resting positions, set by JS from state.pushback */
+    --pLeft:23%;   /* player's resting distance from left wall  */
+    --oRight:23%;  /* opponent's resting distance from right wall */
+    --front:50%;   /* moving clash line between the fighters     */
   }
   *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html,body{ height:100%; margin:0; }
@@ -53,13 +54,20 @@
     background:linear-gradient(180deg,#7be29a,#3ec77f);
     border-radius:0 0 26px 26px;
   }
-  .fighter{ position:absolute; bottom:12%; width:34%; max-width:240px; z-index:2; }
-  /* resting positions track the battle line; they glide when ground changes */
+  .fighter{ position:absolute; bottom:12%; width:30%; max-width:210px; z-index:2; }
+  /* resting positions tug back and forth; they glide a little each round */
   .fighter.player{ left:var(--pLeft); transform-origin:bottom center;
-    transition:left .6s cubic-bezier(.5,1.5,.4,1); }
+    transition:left .55s cubic-bezier(.5,1.4,.4,1); }
   .fighter.opponent{ right:var(--oRight); transform-origin:bottom center;
-    transition:right .6s cubic-bezier(.5,1.5,.4,1); }
+    transition:right .55s cubic-bezier(.5,1.4,.4,1); }
   .fighter svg{ width:100%; height:auto; display:block; }
+
+  /* battle lines drawn in the play area */
+  .bline{ position:absolute; top:10%; bottom:18%; width:0; z-index:1; pointer-events:none; }
+  #frontLine{ left:var(--front); border-left:3px dotted rgba(52,40,90,.35);
+    transition:left .55s cubic-bezier(.5,1.4,.4,1); }
+  #finishLine{ left:78%; border-left:5px dashed rgba(255,91,166,.65); }
+  #finishLine .flag{ position:absolute; top:-7%; left:7px; font-size:clamp(22px,5.5vw,38px); }
 
   /* sword swing animations */
   @keyframes swingP{ 0%{transform:rotate(0)} 30%{transform:rotate(-55deg)} 60%{transform:rotate(20deg)} 100%{transform:rotate(0)} }
@@ -68,20 +76,28 @@
   .swordO.swing{ animation:swingO .42s ease-in-out 3; }
   .swordP,.swordO{ transform-box:fill-box; transform-origin:bottom center; }
 
-  /* CLASH: charge to the centre, then return to the (new) resting spot */
-  @keyframes chargeP{ 0%{transform:translateX(0)} 38%{transform:translateX(50%)}
-    50%{transform:translateX(44%)} 100%{transform:translateX(0)} }
-  @keyframes chargeO{ 0%{transform:translateX(0)} 38%{transform:translateX(-50%)}
-    50%{transform:translateX(-44%)} 100%{transform:translateX(0)} }
-  /* KNOCKBACK: shoved away from the centre when struck */
-  @keyframes knockP{ 0%{transform:translateX(0)} 30%{transform:translateX(-30%)}
-    55%{transform:translateX(-14%)} 100%{transform:translateX(0)} }
-  @keyframes knockO{ 0%{transform:translateX(0)} 30%{transform:translateX(30%)}
-    55%{transform:translateX(14%)} 100%{transform:translateX(0)} }
-  .fighter.player.charge{ animation:chargeP .95s cubic-bezier(.4,0,.3,1) 1; z-index:3; }
-  .fighter.opponent.charge{ animation:chargeO .95s cubic-bezier(.4,0,.3,1) 1; z-index:3; }
-  .fighter.player.knock{ animation:knockP .9s ease-out 1; }
-  .fighter.opponent.knock{ animation:knockO .9s ease-out 1; }
+  /* CLASH: a small step forward to the clash line, then back */
+  @keyframes chargeP{ 0%{transform:translateX(0)} 40%{transform:translateX(32%)}
+    52%{transform:translateX(26%)} 100%{transform:translateX(0)} }
+  @keyframes chargeO{ 0%{transform:translateX(0)} 40%{transform:translateX(-32%)}
+    52%{transform:translateX(-26%)} 100%{transform:translateX(0)} }
+  /* KNOCKBACK: stumble + wobble when struck (opponent), tiny step back (player) */
+  @keyframes knockO{ 0%{transform:translateX(0) rotate(0)}
+    28%{transform:translateX(30%) rotate(11deg)} 48%{transform:translateX(16%) rotate(-7deg)}
+    68%{transform:translateX(21%) rotate(5deg)} 84%{transform:translateX(8%) rotate(-3deg)}
+    100%{transform:translateX(0) rotate(0)} }
+  @keyframes knockP{ 0%{transform:translateX(0) rotate(0)}
+    35%{transform:translateX(-16%) rotate(-6deg)} 65%{transform:translateX(-7%) rotate(3deg)}
+    100%{transform:translateX(0) rotate(0)} }
+  .fighter.player.charge{ animation:chargeP .9s cubic-bezier(.4,0,.3,1) 1; z-index:3; }
+  .fighter.opponent.charge{ animation:chargeO .9s cubic-bezier(.4,0,.3,1) 1; z-index:3; }
+  .fighter.player.knock{ animation:knockP .85s ease-out 1; }
+  .fighter.opponent.knock{ animation:knockO 1s ease-out 1; }
+
+  /* opponent topples over in a silly, harmless way behind the finish line */
+  @keyframes fallOver{ 0%{transform:rotate(0) translateY(0)} 30%{transform:rotate(-15deg)}
+    100%{transform:rotate(86deg) translate(18%,10%)} }
+  .fighter.opponent.fallen{ animation:fallOver 1s ease-in forwards; z-index:2; }
 
   /* ---------- FX layer ---------- */
   #fx{ position:absolute; inset:0; pointer-events:none; z-index:5; overflow:hidden; }
@@ -91,6 +107,15 @@
     transform:translate(-50%,-50%); background:radial-gradient(circle,#fff,#ffd23f 40%,#ff6fb5 70%,transparent 72%);
     animation:boom 1.05s ease-out forwards; z-index:4; }
   @keyframes boom{ from{opacity:1; width:30px;height:30px} 60%{opacity:1} to{opacity:0; width:460px;height:460px} }
+  /* comic-style impact words: POW! BAM! WHACK! */
+  .comic{ position:absolute; transform:translate(-50%,-50%); font-weight:900; z-index:6;
+    font-size:clamp(28px,9vw,62px); -webkit-text-stroke:3px #34285a; paint-order:stroke fill;
+    text-shadow:0 5px 0 rgba(52,40,90,.25); white-space:nowrap; will-change:transform,opacity; }
+  @keyframes comicPop{
+    0%{opacity:0; transform:translate(-50%,-50%) scale(.2) rotate(var(--r,-8deg))}
+    20%{opacity:1; transform:translate(-50%,-50%) scale(1.25) rotate(var(--r,-8deg))}
+    65%{opacity:1; transform:translate(-50%,-50%) scale(1) rotate(var(--r,-8deg))}
+    100%{opacity:0; transform:translate(-50%,-50%) scale(1.1) rotate(var(--r,-8deg))} }
 
   /* battle callout CHA CHA / PA PA */
   #callout{ position:absolute; top:14%; left:50%; transform:translateX(-50%);
@@ -140,6 +165,7 @@
   .overlay{ position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
     text-align:center; padding:24px; z-index:50; background:linear-gradient(180deg,rgba(155,231,255,.96),rgba(255,214,236,.97)); }
   .overlay.hidden{ display:none; }
+  .hidden{ display:none !important; }
   .overlay h1{ font-size:clamp(34px,10vw,72px); margin:0 0 6px; color:var(--ink);
     -webkit-text-stroke:3px #fff; paint-order:stroke fill; text-shadow:0 6px 0 var(--pink); }
   .overlay p{ font-size:clamp(18px,5vw,28px); font-weight:700; max-width:620px; }
@@ -150,12 +176,38 @@
   .big-btn:active{ transform:translateY(6px); box-shadow:0 3px 0 #d6337e; }
   .emoji-row{ font-size:clamp(40px,14vw,90px); }
 
-  /* Level up overlay */
+  /* Level up / trophy overlay */
   #levelup{ z-index:60; }
-  #levelup .rainbow{ font-size:clamp(34px,9vw,64px); font-weight:900;
+  #levelup .rainbow{ font-size:clamp(30px,8vw,58px); font-weight:900;
     background:linear-gradient(90deg,#ff5ba6,#ffd23f,#51e3a0,#4cc9ff,#b388ff);
     -webkit-background-clip:text; background-clip:text; color:transparent; animation:wob 1s ease infinite; }
   @keyframes wob{ 0%,100%{transform:rotate(-3deg) scale(1)} 50%{transform:rotate(3deg) scale(1.06)} }
+
+  /* trophy chooser */
+  .trophies{ display:flex; gap:16px; flex-wrap:wrap; justify-content:center; margin:14px 0 6px; }
+  .trophy-btn{ display:flex; flex-direction:column; align-items:center; cursor:pointer;
+    font-size:clamp(44px,15vw,86px); line-height:1; background:#fff; border:5px solid var(--yellow);
+    border-radius:24px; padding:12px 16px 8px; box-shadow:0 8px 0 rgba(52,40,90,.18); transition:transform .12s; }
+  .trophy-btn:active{ transform:translateY(5px) scale(.96); box-shadow:0 3px 0 rgba(52,40,90,.18); }
+  .trophy-btn .lbl{ font-size:clamp(13px,3.6vw,17px); font-weight:800; margin-top:6px; color:var(--ink); }
+  .trophy-btn.chosen{ animation:wob .8s ease infinite; border-color:var(--pink); }
+  .trophy-btn.dim{ opacity:.3; pointer-events:none; }
+  #trophyReward{ min-height:1.2em; font-weight:900; }
+
+  /* sticker collection rail (always visible on the side) */
+  #app{ margin-right:64px; }
+  #stickerboard{ position:fixed; top:0; right:0; width:64px; height:100dvh; z-index:40;
+    display:flex; flex-direction:column; align-items:center; padding:8px 4px 16px;
+    background:linear-gradient(180deg, rgba(255,255,255,.9), rgba(255,236,247,.92));
+    border-left:4px solid var(--purple); box-shadow:-5px 0 16px rgba(52,40,90,.14);
+    overflow-y:auto; }
+  .sb-title{ font-size:11px; font-weight:900; color:var(--purple); text-align:center;
+    letter-spacing:1px; line-height:1.15; margin-bottom:8px; }
+  .sb-grid{ display:flex; flex-direction:column; align-items:center; gap:7px; width:100%; }
+  .sb-grid .st{ font-size:28px; line-height:1; filter:drop-shadow(0 2px 1px rgba(52,40,90,.2)); }
+  .sb-grid .st.new{ animation:stIn .6s ease-out; }
+  @keyframes stIn{ 0%{transform:scale(0) rotate(-40deg); opacity:0} 60%{transform:scale(1.35)} 100%{transform:scale(1)} }
+  .sb-empty{ font-size:11px; color:#b0a8c4; text-align:center; padding:8px 2px; line-height:1.3; }
 </style>
 </head>
 <body>
@@ -168,6 +220,9 @@
 
   <div class="arena">
     <div class="stage" id="stage">
+      <!-- battle lines -->
+      <div class="bline" id="frontLine"></div>
+      <div class="bline" id="finishLine"><span class="flag">🏁</span></div>
       <!-- PLAYER (girl) -->
       <div class="fighter player" id="player">
         <svg viewBox="0 0 200 240" aria-label="player">
@@ -248,12 +303,19 @@
   <p style="font-size:16px;opacity:.8;margin-top:14px;">We'll ask to use the microphone so we can hear your awesome voice.</p>
 </div>
 
-<!-- Level up overlay -->
+<!-- Trophy level-up overlay -->
 <div class="overlay hidden" id="levelup">
-  <div class="rainbow">SAMURAI SWORD SENSEI<br>LEVEL UP!</div>
-  <div class="emoji-row">🏆 ⭐ 🌈 ⭐ 🏆</div>
-  <button class="big-btn" id="levelContinue">KEEP GOING! ✨</button>
+  <div class="rainbow" id="luTitle">YOU WON THE BATTLE!<br>PICK YOUR TROPHY!</div>
+  <div class="trophies" id="trophyRow"></div>
+  <div class="emoji-row" id="trophyReward"></div>
+  <button class="big-btn hidden" id="levelContinue">KEEP GOING! ✨</button>
 </div>
+
+<!-- Sticker collection (always on the side) -->
+<aside id="stickerboard">
+  <div class="sb-title">MY<br>STICKERS</div>
+  <div class="sb-grid" id="sbGrid"></div>
+</aside>
 
 <script>
 (function(){
@@ -302,6 +364,18 @@ let silenceTimer = null;
 let rec = null;             // SpeechRecognition
 let ac = null;              // AudioContext
 
+/* ---- tug-of-war tuning ---- */
+const START_PUSH = 20;      // each level starts roughly even
+const WIN_STEP   = 14;      // ground gained per correct word
+const LOSE_STEP  = 8;       // ground given back per wrong sound
+const GOAL       = 100;     // opponent is behind the finish line at this point
+
+/* ---- patient-listening trackers (reset each round) ---- */
+let roundStart = 0;
+let roundAttempts = 0;      // how many real spoken attempts this round
+let lastAttemptClose = false; // was the latest attempt near the target word?
+let lastEncourage = 0;      // timestamp of the last spoken encouragement
+
 /* ---------- DOM ---------- */
 const $ = id => document.getElementById(id);
 const ui = {
@@ -310,14 +384,22 @@ const ui = {
   callout:$("callout"), fx:$("fx"), player:$("player"), opponent:$("opponent"),
   swordP:document.querySelector(".swordP"), swordO:document.querySelector(".swordO"),
   practice:$("practice"),
+  levelup:$("levelup"), luTitle:$("luTitle"), trophyRow:$("trophyRow"),
+  trophyReward:$("trophyReward"), levelContinue:$("levelContinue"), sbGrid:$("sbGrid"),
 };
 
 /* ============================================================
    PROGRESS SAVE / LOAD
    ============================================================ */
 function loadProgress(){
-  try{ const s=JSON.parse(localStorage.getItem(SAVE_KEY)); if(s) return s; }catch(e){}
-  return { score:0, streak:0, best:0, level:1, pushback:30 };
+  let s=null;
+  try{ s=JSON.parse(localStorage.getItem(SAVE_KEY)); }catch(e){}
+  if(!s || typeof s!=="object") s={};
+  return {
+    score: s.score||0, streak: s.streak||0, best: s.best||0, level: s.level||1,
+    pushback: (typeof s.pushback==="number") ? s.pushback : 20, // 0..100, 20 = even start
+    stickers: Array.isArray(s.stickers) ? s.stickers : []       // earned sticker emoji
+  };
 }
 function saveProgress(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(state)); }catch(e){} }
 function refreshUI(){
@@ -327,25 +409,26 @@ function refreshUI(){
   applyGround();
 }
 
-/* ---- Battle-line geometry ----
-   state.pushback (18..92) is the player's territory advantage. Higher = the
-   meeting point sits further into the opponent's half. Both fighters rest a
-   fixed gap on either side of that line, so the screen always shows who is
-   winning the ground war. */
+/* ---- Tug-of-war geometry ----
+   state.pushback (0..100) is the player's progress this level. The fighters
+   stand close together near the centre and inch back and forth: every correct
+   answer nudges them toward the opponent's side, every miss nudges them back.
+   At pushback >= GOAL the opponent is pushed behind the finish line. */
+const HALF = 15;                           // fighter half-width (% of stage; 30% wide)
 function battleGeom(p){
-  const line = 50 + (p - 50) * 0.45;     // meeting point, % from left
-  const half = 18;                        // each fighter rests this far off the line
-  let pLeft  = (line - half) - 17;        // player centre minus half its width
-  let oRight = 100 - ((line + half) + 17);// opponent centre, expressed as right offset
-  pLeft  = Math.max(1, Math.min(42, pLeft));
-  oRight = Math.max(1, Math.min(42, oRight));
-  return { line, pLeft, oRight };
+  const playerC = 40 + p * 0.30;           // player centre: 40% -> 70%
+  const oppC    = 60 + p * 0.24;           // opponent centre: 60% -> 84%
+  const front   = (playerC + oppC) / 2;    // clash line drifts with the battle
+  let pLeft  = Math.max(1,  playerC - HALF);
+  let oRight = Math.max(-2, 100 - (oppC + HALF));
+  return { playerC, oppC, front, pLeft, oRight };
 }
 function applyGround(){
   const g = battleGeom(state.pushback);
   const r = document.documentElement.style;
-  r.setProperty("--pLeft", g.pLeft + "%");
+  r.setProperty("--pLeft",  g.pLeft  + "%");
   r.setProperty("--oRight", g.oRight + "%");
+  r.setProperty("--front",  g.front  + "%");
   return g;
 }
 
@@ -382,24 +465,55 @@ function rhymeClose(a,b){
   return lev(a,b) <= thresh;
 }
 
+/* Find the target word inside a (possibly chatty) list of heard tokens.
+   Searches in order from `from`; if requireOnset, only accepts a token whose
+   articulation sound also matches. Returns the heard-token index or -1. */
+function findWord(heard, w, from, requireOnset){
+  for(let j=from; j<heard.length; j++){
+    if(rhymeClose(w.rhyme, heard[j].rhyme) && (!requireOnset || heard[j].onset===w.onset)) return j;
+  }
+  return -1;
+}
+
 /* Evaluate one heard transcript against the target's contrastive words.
+   The child does NOT have to say the phrase in isolation — "I think it's ship"
+   still counts. We only judge the articulation of the target word itself.
    Returns 'correct' | {coach:msg} | 'unclear'  */
 function evalTranscript(text){
   const heard = contrastTokens(text);
   const want = target.contrast;
-  if(heard.length < want.length) return "unclear";      // didn't say the whole thing yet
+  if(!want.length || !heard.length) return "unclear";
 
-  // align in order (the contrast words always appear in order)
-  let firstMiss = null, allMatch = true;
-  for(let i=0;i<want.length;i++){
-    const w = want[i], h = heard[i];
-    if(!rhymeClose(w.rhyme, h.rhyme)){ allMatch=false; continue; } // not the right word -> ignore noise
-    if(h.onset === w.onset){ /* good for this word */ }
-    else { allMatch=false; if(!firstMiss) firstMiss={want:w, heard:h}; }
+  // Pass 1 — favour success: can every target word be found with the RIGHT sound?
+  let from = 0, ok = true;
+  for(const w of want){
+    const idx = findWord(heard, w, from, true);
+    if(idx < 0){ ok = false; break; }
+    from = idx + 1;
   }
-  if(allMatch && want.length) return "correct";
-  if(firstMiss) return { coach: buildCoach(firstMiss.want, firstMiss.heard) };
+  if(ok) return "correct";
+
+  // Pass 2 — rhyme only: did she clearly say the target word with a WRONG sound?
+  from = 0; let firstMiss = null, found = 0;
+  for(const w of want){
+    const idx = findWord(heard, w, from, false);
+    if(idx < 0) break;
+    const h = heard[idx]; from = idx + 1; found++;
+    if(h.onset !== w.onset && !firstMiss) firstMiss = { want:w, heard:h };
+  }
+  if(found === want.length && firstMiss) return { coach: buildCoach(firstMiss.want, firstMiss.heard) };
   return "unclear";
+}
+
+/* Was this transcript a reasonable attempt at the target word (right shape,
+   any sound)? Used only to decide whether gentle encouragement is warranted. */
+function isAttemptClose(text){
+  const heard = contrastTokens(text);
+  if(!heard.length) return false;
+  for(const w of target.contrast)
+    for(const h of heard)
+      if(rhymeClose(w.rhyme, h.rhyme)) return true;
+  return false;
 }
 
 function buildCoach(want, heard){
@@ -436,11 +550,18 @@ function initRecognition(){
     // Favor SUCCESS: if ANY alternative is correct -> win.
     for(const a of alts){ if(evalTranscript(a)==="correct"){ onCorrect(); return; } }
 
-    // Only act on coaching for FINAL results (avoid premature scolding).
+    // Only act on FINAL results (avoid premature scolding on interim noise).
     if(res.isFinal){
+      // a wrong SOUND on the right word -> opponent counter-attacks
       for(const a of alts){
         const r = evalTranscript(a);
         if(r && r.coach){ onCoach(r.coach); return; }
+      }
+      // otherwise: just remember she tried, and how close — stay silent
+      const hadSpeech = alts.some(a=>/[a-z]/i.test(a));
+      if(hadSpeech){
+        roundAttempts++;
+        if(alts.some(isAttemptClose)) lastAttemptClose = true;
       }
     }
   };
@@ -455,8 +576,12 @@ function startListening(){
   busy = false;
   micDot(true);
   setStatus("Listening… say it loud and proud! 🎤", true);
+  // fresh round of patient listening
+  roundStart = Date.now();
+  roundAttempts = 0;
+  lastAttemptClose = false;
   safeStart();
-  armSilence();
+  armPatience();
 }
 function stopListening(){
   shouldListen = false;
@@ -464,15 +589,23 @@ function stopListening(){
   micDot(false);
   if(rec && recognizing){ try{ rec.stop(); }catch(e){} }
 }
-function armSilence(){
+/* Patient listening: stay silent by default. Only offer a gentle nudge when
+   (1) >10s have passed, (2) she has made a real attempt, (3) that attempt was
+   reasonably close to the target word — and never more than once per 15s. */
+const ENCOURAGE = ["Take your time.","You can do it.","Listen carefully and try again."];
+function armPatience(){
   clearTimeout(silenceTimer);
   silenceTimer = setTimeout(()=>{
     if(busy || !shouldListen) return;
-    showClue();
-    setStatus("Here's a picture to help. You can do it! 💪", true);
-    speak("Take your time. You can do it!"); // never names the answer
-    armSilence(); // keep gently waiting
-  }, 6500);
+    const now = Date.now();
+    if(now - roundStart > 10000 && roundAttempts >= 1 && lastAttemptClose
+       && now - lastEncourage > 15000){
+      showClue();
+      speak(ENCOURAGE[Math.floor(Math.random()*ENCOURAGE.length)]);
+      lastEncourage = now;
+    }
+    armPatience(); // keep listening quietly and check again
+  }, 3000);
 }
 
 /* ============================================================
@@ -502,25 +635,25 @@ function onCorrect(){
   // score & streak
   state.score++; state.streak++;
   if(state.streak>state.best) state.best=state.streak;
-  // player gains ground; this persists between rounds via saveProgress()
-  state.pushback = Math.min(92, state.pushback + 12);
+  // player steps forward, pushing the opponent back (persists via saveProgress)
+  state.pushback = Math.min(GOAL, state.pushback + WIN_STEP);
   refreshUI(); saveProgress();
   setStatus("YES! Perfect sword strike! 🌟", false);
 
-  // player charges in, strikes, opponent is knocked back to its new ground
+  // player charges in, strikes, opponent stumbles back; comic POW/BAM/WHACK!
   callout("CHA CHA CHA CHA!", false);
   clash("player");
-  // celebration lingers so it's actually enjoyable to watch
-  confetti(50); stars(16);
+  confetti(40); stars(14);
 
+  const won = state.pushback >= GOAL;
   const praises = ["Great job, Samurai Sword Sensei!","Wonderful! Cha cha cha!","You got it, Sensei!","Beautiful sword strike!","Amazing speaking!"];
-  const line = state.score%3===0 ? "Great job, Samurai Sword Sensei!" : praises[Math.floor(Math.random()*praises.length)];
+  const line = won ? "You pushed them off the edge! You win!"
+    : (state.score%3===0 ? "Great job, Samurai Sword Sensei!" : praises[Math.floor(Math.random()*praises.length)]);
 
-  // Level up every 5 correct
-  if(state.streak>0 && state.streak%5===0){
-    speak(line, ()=> setTimeout(levelUp, 700));
+  if(won){
+    speak(line, ()=> setTimeout(winBattle, 600));
   } else {
-    // wait for the confetti to settle before the next word appears
+    // let the celebration settle before the next word appears
     speak(line, ()=> setTimeout(nextRound, 1500));
   }
 }
@@ -529,9 +662,9 @@ function onCoach(msg){
   if(busy) return;
   busy = true;
   stopListening();
-  // opponent counter-attacks gently — player gives a little ground (never a real loss)
+  // opponent steps forward — player gives a little ground (never a real loss)
   state.streak = 0;
-  state.pushback = Math.max(18, state.pushback - 6);
+  state.pushback = Math.max(0, state.pushback - LOSE_STEP);
   refreshUI(); saveProgress();
 
   callout("PA PA PA PA!", true);
@@ -545,13 +678,78 @@ function onCoach(msg){
   });
 }
 
-function levelUp(){
+/* ---- Trophies & stickers ---- */
+const TROPHIES = [
+  {name:"Rainbow",  emoji:"🌈🏆"},
+  {name:"Princess", emoji:"👑🏆"},
+  {name:"Dragon",   emoji:"🐉🏆"},
+  {name:"Kitten",   emoji:"🐱🏆"},
+  {name:"Heart",    emoji:"💖🏆"},
+  {name:"Star",     emoji:"⭐🏆"},
+];
+const STICKERS = ["🐱","💖","🎀","🎈","🦄","🌈","👑","🦋","🐉","⭐","🌸"];
+
+/* The opponent is pushed behind the finish line: topple + trophy screen. */
+function winBattle(){
+  busy = true;
   state.level++;
   saveProgress(); refreshUI();
-  sndFanfare();
+  ui.opponent.classList.remove("charge","knock");
+  ui.opponent.classList.add("fallen");
+  dizzy(battleGeom(state.pushback).oppC);
+  sndFanfare(); callout("VICTORY!", false);
+  setTimeout(openTrophyScreen, 1100);
+}
+
+function openTrophyScreen(){
+  const pool = TROPHIES.slice().sort(()=>Math.random()-0.5).slice(0,3);
+  ui.trophyRow.innerHTML = "";
+  ui.trophyReward.textContent = "";
+  ui.levelContinue.classList.add("hidden");
+  pool.forEach(tr=>{
+    const b=document.createElement("button");
+    b.className="trophy-btn";
+    b.innerHTML = `${tr.emoji}<span class="lbl">${tr.name}</span>`;
+    b.onclick=()=>chooseTrophy(tr, b);
+    ui.trophyRow.appendChild(b);
+  });
+  ui.levelup.classList.remove("hidden");
   rainbowBurst();
-  $("levelup").classList.remove("hidden");
-  speak("Samurai Sword Sensei Level Up!");
+  speak("You win! Pick your trophy!");
+}
+
+function chooseTrophy(tr, btn){
+  [...ui.trophyRow.children].forEach(c=>{ if(c!==btn) c.classList.add("dim"); });
+  btn.classList.add("chosen");
+  // award the chosen trophy plus a couple of surprise stickers
+  const bonus = STICKERS.slice().sort(()=>Math.random()-0.5).slice(0,2);
+  const earned = [tr.emoji, ...bonus];
+  earned.forEach(e=>state.stickers.push(e));
+  saveProgress();
+  renderStickers(earned.length);
+  rainbowBurst();
+  ui.trophyReward.textContent = "You earned " + earned.join(" ");
+  ui.levelContinue.classList.remove("hidden");
+  speak("Yay! New stickers for your collection!");
+}
+
+function renderStickers(newCount){
+  const arr = state.stickers || [];
+  ui.sbGrid.innerHTML = "";
+  if(!arr.length){
+    ui.sbGrid.innerHTML = '<div class="sb-empty">Win battles to collect stickers!</div>';
+    return;
+  }
+  const firstNew = (newCount>0) ? arr.length - newCount : -1;
+  arr.forEach((e,i)=>{
+    const d=document.createElement("div");
+    d.className = "st" + (i>=firstNew ? " new" : "");
+    d.textContent = e;
+    ui.sbGrid.appendChild(d);
+  });
+  // keep the newest stickers in view
+  const rail = ui.sbGrid.parentElement;
+  rail.scrollTop = rail.scrollHeight;
 }
 
 /* ============================================================
@@ -614,8 +812,37 @@ function stars(n){
 }
 function rainbowBurst(){ confetti(90); stars(28); boom(); setTimeout(()=>{ confetti(60); stars(18); }, 700); }
 
-/* ---- Samurai clash: one fighter charges to the centre and strikes,
-   the other is knocked backward; an impact pops at the meeting line ---- */
+/* comic-book impact words near the clash line */
+const COMIC_WORDS = ["POW!","BAM!","WHACK!"];
+function comicHits(xPct){
+  COMIC_WORDS.forEach((word,i)=>setTimeout(()=>{
+    const c=document.createElement("div"); c.className="comic"; c.textContent=word;
+    c.style.left=(xPct + (Math.random()*16-8))+"%";
+    c.style.top=(32 + Math.random()*22)+"%";
+    c.style.color=COLORS[(i+1)%COLORS.length];
+    c.style.setProperty("--r",(Math.random()*26-13)+"deg");
+    c.style.animation="comicPop 1.2s ease-out forwards";
+    ui.fx.appendChild(c); setTimeout(()=>c.remove(),1250);
+  }, i*170));
+}
+/* dizzy stars circling a fighter (used when the opponent topples) */
+function dizzy(xPct){
+  const E=["💫","⭐","✨"];
+  for(let i=0;i<6;i++){
+    const s=document.createElement("div"); s.className="spark"; s.textContent=E[i%E.length];
+    s.style.left=(xPct+(Math.random()*14-7))+"%"; s.style.top=(20+Math.random()*16)+"%";
+    const dx=(Math.random()*2-1)*90, dy=-(20+Math.random()*60);
+    s.animate([
+      {transform:"translate(0,0) scale(.5)",opacity:0},
+      {transform:`translate(${dx*.5}px,${dy*.5}px) scale(1.1)`,opacity:1,offset:.4},
+      {transform:`translate(${dx}px,${dy}px) scale(.9)`,opacity:0}
+    ], {duration:1800+Math.random()*600, easing:"ease-out"});
+    ui.fx.appendChild(s); setTimeout(()=>s.remove(),2500);
+  }
+}
+
+/* ---- Samurai clash: the winner steps forward and strikes, the loser stumbles
+   back; an impact + comic words pop at the moving front line ---- */
 function clash(winner){
   const g = battleGeom(state.pushback);
   const charger = winner==="player" ? ui.player : ui.opponent;
@@ -625,11 +852,12 @@ function clash(winner){
   void charger.offsetWidth;
   charger.classList.add("charge");
   victim.classList.add("knock");
-  // strike + impact land at the clash moment (~38% of the .95s charge)
+  // strike + impact land at the clash moment (~40% of the .9s charge)
   setTimeout(()=>{
     swing(sword, "");
-    boom(g.line, 42);
-    if(winner==="player") sndSuccess(); else sndThud();
+    boom(g.front, 42);
+    if(winner==="player"){ sndSuccess(); comicHits(g.front); }
+    else { sndThud(); }
   }, 330);
 }
 
@@ -716,12 +944,16 @@ function startGame(){
 }
 
 $("startBtn").addEventListener("click", startGame);
-$("levelContinue").addEventListener("click", ()=>{
-  $("levelup").classList.add("hidden");
-  setTimeout(nextRound, 200);
+ui.levelContinue.addEventListener("click", ()=>{
+  ui.levelup.classList.add("hidden");
+  ui.opponent.classList.remove("fallen");
+  state.pushback = START_PUSH;          // restart the tug-of-war for the next level
+  saveProgress(); refreshUI();
+  setTimeout(nextRound, 250);
 });
 
 refreshUI();
+renderStickers();
 })();
 </script>
 </body>
