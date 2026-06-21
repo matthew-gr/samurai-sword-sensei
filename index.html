@@ -155,7 +155,9 @@
   .pair .lbl{ font-size:clamp(12px,3.4vw,15px); font-weight:900; letter-spacing:1px; color:var(--ink); margin-top:2px; }
   .pair.goal{ border-color:var(--yellow); }
   .pair.heard{ animation:heardPulse .9s ease; }
-  @keyframes heardPulse{ 0%{transform:scale(1); border-color:#ff6b6b} 30%{transform:scale(1.12); border-color:#ff6b6b} 100%{transform:scale(1)} }
+  .pair.goal.heard{ animation:heardGood .9s ease; }
+  @keyframes heardPulse{ 0%{transform:scale(1); border-color:#fff} 35%{transform:scale(1.14); border-color:#ff9f43} 100%{transform:scale(1); border-color:#fff} }
+  @keyframes heardGood{ 0%{transform:scale(1); border-color:var(--yellow)} 35%{transform:scale(1.16); border-color:#51e3a0} 100%{transform:scale(1); border-color:var(--yellow)} }
   .pair .bar{ height:10px; border-radius:6px; background:#eef0f4; margin-top:6px; overflow:hidden; visibility:hidden; }
   .pair.goal .bar{ visibility:visible; }
   .pair .bar > i{ display:block; height:100%; width:0%; border-radius:6px; background:#ff6b6b;
@@ -622,14 +624,14 @@ function initRecognition(){
     for(let i=0;i<res.length;i++) alts.push(res[i].transcript);
 
     // Favor SUCCESS: if ANY alternative is correct -> win.
-    for(const a of alts){ if(evalTranscript(a)==="correct"){ onCorrect(); return; } }
+    for(const a of alts){ if(evalTranscript(a)==="correct"){ flashHeard(attemptOnset(a)); onCorrect(); return; } }
 
     // Only act on FINAL results (avoid premature scolding on interim noise).
     if(res.isFinal){
       // a wrong SOUND on the right word -> opponent counter-attacks
       for(const a of alts){
         const r = evalTranscript(a);
-        if(r && r.coach){ flashHeard(heardOnsetFor(a)); onCoach(r.coach); return; }
+        if(r && r.coach){ flashHeard(attemptOnset(a)); onCoach(r.coach); return; }
       }
       // otherwise: just remember she tried, and how close — stay silent
       const hadSpeech = alts.some(a=>/[a-z]/i.test(a));
@@ -1077,11 +1079,16 @@ function flashHeard(onset){
   const c=ui.pairs.querySelector(`.pair[data-onset="${onset}"]`); if(!c) return;
   c.classList.remove("heard"); void c.offsetWidth; c.classList.add("heard");
 }
-// which one of our four onsets did she actually produce on the target word?
-function heardOnsetFor(text){
+// which of our four sounds did she actually produce on the target word?
+// (works for a correct hit OR a wrong-sound substitution, so we can highlight
+// whichever variant she sounded most like — ship vs sip vs chip vs zip)
+function attemptOnset(text){
   const al = alignTarget(allWords(text));
-  const miss = al.find(a=>a.status==="wrongsound");
-  return miss ? miss.heard.onset : null;
+  const hit = al.find(a=>a.status==="good"||a.status==="wrongsound");
+  if(!hit) return null;
+  if(hit.heard && hit.heard.onset) return hit.heard.onset;
+  if(hit.status==="good") return target.contrast[0].onset; // she nailed the target sound
+  return null;
 }
 
 /* ============================================================
@@ -1150,37 +1157,47 @@ function ipaOnset(ph){
 function onsetScoreFromNBest(nbest){
   if(!nbest || !nbest.Words) return null;
   const words = nbest.Words.filter(w=> (w.PronunciationAssessment&&w.PronunciationAssessment.ErrorType)!=="Insertion");
-  const scores=[];
+  const scores=[]; let from=0;
   for(const ct of target.contrast){
-    const m = words.find(w=>{ const c=classify(w.Word||""); return rhymeClose(c.rhyme,ct.rhyme)||wordClose(c.word,ct.word); });
-    if(m && m.Phonemes && m.Phonemes.length){
-      const pa = m.Phonemes[0].PronunciationAssessment;
+    let idx=-1;
+    for(let j=from; j<words.length; j++){
+      const c=classify(words[j].Word||"");
+      if(rhymeClose(c.rhyme,ct.rhyme)||wordClose(c.word,ct.word)){ idx=j; break; }
+    }
+    if(idx<0) continue;                              // word not found in order — skip it
+    from=idx+1;
+    const m=words[idx];
+    if(m.Phonemes && m.Phonemes.length){
+      const pa=m.Phonemes[0].PronunciationAssessment;
       scores.push(pa ? pa.AccuracyScore : 0);
     }
   }
-  return scores.length ? Math.min(...scores) : null;
+  if(!scores.length) return null;
+  // AVERAGE (not min) so one soft sound in a multi-word phrase doesn't block the win
+  return scores.reduce((a,b)=>a+b,0) / scores.length;
 }
 function onAzureResult(text, nbest){
   if(busy || !shouldListen) return;
   const verdict = evalTranscript(text);           // reuse the proven word-gate
   if(verdict === "correct"){
+    flashHeard(attemptOnset(text));               // light up the word she sounded like
     const score = onsetScoreFromNBest(nbest);     // graduated quality of the target sound
-    if(score==null){ onCorrect(); return; }       // no score available -> accept
-    setBar(score);
-    if(score >= WIN_THRESHOLD){ onCorrect(); }
-    else {                                          // right word, sound not strong enough yet
-      const nm = ONSET[target.contrast[0].onset];
-      setStatus("So close! Make that "+(nm?nm.want:"sound")+" — try again! 💪", true);
-    }
+    if(score==null || score >= WIN_THRESHOLD){ if(score!=null) setBar(score); onCorrect(); return; }
+    setBar(score);                                 // right word, sound not strong enough yet
+    const nm = ONSET[target.contrast[0].onset];
+    setStatus("So close! Make that "+(nm?nm.want:"sound")+" — try again! 💪", true);
     return;
   }
   if(verdict && verdict.coach){
-    flashHeard(heardOnsetFor(text));
+    flashHeard(attemptOnset(text));               // light up the sibling she said
     onCoach(verdict.coach);
     return;
   }
   // free talk / questions / noise -> ignore, just note a close attempt for patience
-  if(/[a-z]/i.test(text) && isAttemptClose(text)){ roundAttempts++; lastAttemptClose=true; }
+  if(/[a-z]/i.test(text) && isAttemptClose(text)){
+    roundAttempts++; lastAttemptClose=true;
+    flashHeard(attemptOnset(text));               // still show what it sounded like
+  }
 }
 
 /* ============================================================
