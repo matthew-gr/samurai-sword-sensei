@@ -8,10 +8,10 @@
   :root{
     --pink:#ff6fb5; --pink-soft:#ffd6ec; --blue:#4cc9ff; --yellow:#ffd23f;
     --green:#51e3a0; --purple:#b388ff; --ink:#34285a;
-    /* tug-of-war resting positions, set by JS from state.pushback */
-    --pLeft:23%;   /* player's resting distance from left wall  */
-    --oRight:23%;  /* opponent's resting distance from right wall */
-    --front:50%;   /* moving clash line between the fighters     */
+    /* tug-of-war centre positions (% from left), set by JS from state.pushback */
+    --pLeft:46%;   /* player's centre   */
+    --oLeft:60%;   /* opponent's centre */
+    --front:53%;   /* moving clash line between the fighters */
   }
   *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html,body{ height:100%; margin:0; }
@@ -54,50 +54,55 @@
     background:linear-gradient(180deg,#7be29a,#3ec77f);
     border-radius:0 0 26px 26px;
   }
-  .fighter{ position:absolute; bottom:12%; width:30%; max-width:210px; z-index:2; }
-  /* resting positions tug back and forth; they glide a little each round */
-  .fighter.player{ left:var(--pLeft); transform-origin:bottom center;
-    transition:left .55s cubic-bezier(.5,1.4,.4,1); }
-  .fighter.opponent{ right:var(--oRight); transform-origin:bottom center;
-    transition:right .55s cubic-bezier(.5,1.4,.4,1); }
+  /* `left` is the fighter's CENTRE; translateX(-50%) keeps it centred no matter
+     how wide the SVG renders (so they always meet, even on big screens). */
+  .fighter{ position:absolute; bottom:12%; width:36%; max-width:280px; z-index:2;
+    transform:translateX(-50%); }
+  .fighter.player{ left:var(--pLeft); transition:left .5s cubic-bezier(.5,1.4,.4,1); }
+  .fighter.opponent{ left:var(--oLeft); transition:left .5s cubic-bezier(.5,1.4,.4,1); }
+  .fighter.charge{ z-index:3; }
   .fighter svg{ width:100%; height:auto; display:block; }
+  /* the body wrapper carries the attack motion, independent of placement */
+  .figbody{ transform-origin:bottom center; }
 
   /* battle lines drawn in the play area */
   .bline{ position:absolute; top:10%; bottom:18%; width:0; z-index:1; pointer-events:none; }
   #frontLine{ left:var(--front); border-left:3px dotted rgba(52,40,90,.35);
-    transition:left .55s cubic-bezier(.5,1.4,.4,1); }
-  #finishLine{ left:78%; border-left:5px dashed rgba(255,91,166,.65); }
+    transition:left .5s cubic-bezier(.5,1.4,.4,1); }
+  #finishLine{ left:74%; border-left:5px dashed rgba(255,91,166,.65); }
   #finishLine .flag{ position:absolute; top:-7%; left:7px; font-size:clamp(22px,5.5vw,38px); }
 
-  /* sword swing animations */
-  @keyframes swingP{ 0%{transform:rotate(0)} 30%{transform:rotate(-55deg)} 60%{transform:rotate(20deg)} 100%{transform:rotate(0)} }
-  @keyframes swingO{ 0%{transform:rotate(0)} 30%{transform:rotate(55deg)} 60%{transform:rotate(-20deg)} 100%{transform:rotate(0)} }
-  .swordP.swing{ animation:swingP .42s ease-in-out 3; }
-  .swordO.swing{ animation:swingO .42s ease-in-out 3; }
+  /* sword swing: a big overhead wind-up and chop so it clearly reads */
+  @keyframes swingP{ 0%{transform:rotate(0)} 18%{transform:rotate(-95deg)}
+    50%{transform:rotate(80deg)} 72%{transform:rotate(35deg)} 100%{transform:rotate(0)} }
+  @keyframes swingO{ 0%{transform:rotate(0)} 18%{transform:rotate(95deg)}
+    50%{transform:rotate(-80deg)} 72%{transform:rotate(-35deg)} 100%{transform:rotate(0)} }
+  .swordP.swing{ animation:swingP .6s ease-in-out 3; }
+  .swordO.swing{ animation:swingO .6s ease-in-out 3; }
   .swordP,.swordO{ transform-box:fill-box; transform-origin:bottom center; }
 
-  /* CLASH: a small step forward to the clash line, then back */
-  @keyframes chargeP{ 0%{transform:translateX(0)} 40%{transform:translateX(32%)}
-    52%{transform:translateX(26%)} 100%{transform:translateX(0)} }
-  @keyframes chargeO{ 0%{transform:translateX(0)} 40%{transform:translateX(-32%)}
-    52%{transform:translateX(-26%)} 100%{transform:translateX(0)} }
+  /* CLASH: step forward into the clash line, then back */
+  @keyframes chargeP{ 0%{transform:translateX(0)} 42%{transform:translateX(46%)}
+    54%{transform:translateX(38%)} 100%{transform:translateX(0)} }
+  @keyframes chargeO{ 0%{transform:translateX(0)} 42%{transform:translateX(-46%)}
+    54%{transform:translateX(-38%)} 100%{transform:translateX(0)} }
   /* KNOCKBACK: stumble + wobble when struck (opponent), tiny step back (player) */
   @keyframes knockO{ 0%{transform:translateX(0) rotate(0)}
-    28%{transform:translateX(30%) rotate(11deg)} 48%{transform:translateX(16%) rotate(-7deg)}
-    68%{transform:translateX(21%) rotate(5deg)} 84%{transform:translateX(8%) rotate(-3deg)}
+    28%{transform:translateX(34%) rotate(12deg)} 48%{transform:translateX(18%) rotate(-8deg)}
+    68%{transform:translateX(23%) rotate(6deg)} 84%{transform:translateX(9%) rotate(-3deg)}
     100%{transform:translateX(0) rotate(0)} }
   @keyframes knockP{ 0%{transform:translateX(0) rotate(0)}
-    35%{transform:translateX(-16%) rotate(-6deg)} 65%{transform:translateX(-7%) rotate(3deg)}
+    35%{transform:translateX(-18%) rotate(-7deg)} 65%{transform:translateX(-8%) rotate(3deg)}
     100%{transform:translateX(0) rotate(0)} }
-  .fighter.player.charge{ animation:chargeP .9s cubic-bezier(.4,0,.3,1) 1; z-index:3; }
-  .fighter.opponent.charge{ animation:chargeO .9s cubic-bezier(.4,0,.3,1) 1; z-index:3; }
-  .fighter.player.knock{ animation:knockP .85s ease-out 1; }
-  .fighter.opponent.knock{ animation:knockO 1s ease-out 1; }
+  .fighter.player.charge  .figbody{ animation:chargeP .9s cubic-bezier(.4,0,.3,1) 1; }
+  .fighter.opponent.charge .figbody{ animation:chargeO .9s cubic-bezier(.4,0,.3,1) 1; }
+  .fighter.player.knock   .figbody{ animation:knockP .85s ease-out 1; }
+  .fighter.opponent.knock .figbody{ animation:knockO 1s ease-out 1; }
 
   /* opponent topples over in a silly, harmless way behind the finish line */
   @keyframes fallOver{ 0%{transform:rotate(0) translateY(0)} 30%{transform:rotate(-15deg)}
     100%{transform:rotate(86deg) translate(18%,10%)} }
-  .fighter.opponent.fallen{ animation:fallOver 1s ease-in forwards; z-index:2; }
+  .fighter.opponent.fallen .figbody{ animation:fallOver 1s ease-in forwards; }
 
   /* ---------- FX layer ---------- */
   #fx{ position:absolute; inset:0; pointer-events:none; z-index:5; overflow:hidden; }
@@ -225,6 +230,7 @@
       <div class="bline" id="finishLine"><span class="flag">🏁</span></div>
       <!-- PLAYER (girl) -->
       <div class="fighter player" id="player">
+        <div class="figbody">
         <svg viewBox="0 0 200 240" aria-label="player">
           <!-- balloon sword -->
           <g class="swordP">
@@ -253,10 +259,12 @@
           <path d="M80 180 L72 220" stroke="#34285a" stroke-width="6" stroke-linecap="round"/>
           <path d="M100 180 L108 220" stroke="#34285a" stroke-width="6" stroke-linecap="round"/>
         </svg>
+        </div>
       </div>
 
       <!-- OPPONENT -->
       <div class="fighter opponent" id="opponent">
+        <div class="figbody">
         <svg viewBox="0 0 200 240" aria-label="opponent">
           <g class="swordO">
             <rect x="24" y="40" width="26" height="150" rx="13" fill="#4cc9ff" stroke="#34285a" stroke-width="4"/>
@@ -278,6 +286,7 @@
           <path d="M100 174 L92 220" stroke="#34285a" stroke-width="6" stroke-linecap="round"/>
           <path d="M120 174 L128 220" stroke="#34285a" stroke-width="6" stroke-linecap="round"/>
         </svg>
+        </div>
       </div>
 
       <div id="callout"></div>
@@ -411,24 +420,22 @@ function refreshUI(){
 
 /* ---- Tug-of-war geometry ----
    state.pushback (0..100) is the player's progress this level. The fighters
-   stand close together near the centre and inch back and forth: every correct
-   answer nudges them toward the opponent's side, every miss nudges them back.
-   At pushback >= GOAL the opponent is pushed behind the finish line. */
-const HALF = 15;                           // fighter half-width (% of stage; 30% wide)
+   stand close together near the centre (positioned by their CENTRE point) and
+   inch back and forth: every correct answer nudges them toward the opponent's
+   side, every miss nudges them back. At pushback >= GOAL the opponent is pushed
+   behind the finish line (74%). */
 function battleGeom(p){
-  const playerC = 40 + p * 0.30;           // player centre: 40% -> 70%
-  const oppC    = 60 + p * 0.24;           // opponent centre: 60% -> 84%
+  const playerC = 44 + p * 0.24;           // player centre: 44% -> 68%
+  const oppC    = 56 + p * 0.22;           // opponent centre: 56% -> 78%
   const front   = (playerC + oppC) / 2;    // clash line drifts with the battle
-  let pLeft  = Math.max(1,  playerC - HALF);
-  let oRight = Math.max(-2, 100 - (oppC + HALF));
-  return { playerC, oppC, front, pLeft, oRight };
+  return { playerC, oppC, front };
 }
 function applyGround(){
   const g = battleGeom(state.pushback);
   const r = document.documentElement.style;
-  r.setProperty("--pLeft",  g.pLeft  + "%");
-  r.setProperty("--oRight", g.oRight + "%");
-  r.setProperty("--front",  g.front  + "%");
+  r.setProperty("--pLeft", g.playerC + "%");
+  r.setProperty("--oLeft", g.oppC    + "%");
+  r.setProperty("--front", g.front   + "%");
   return g;
 }
 
@@ -465,14 +472,42 @@ function rhymeClose(a,b){
   return lev(a,b) <= thresh;
 }
 
-/* Find the target word inside a (possibly chatty) list of heard tokens.
-   Searches in order from `from`; if requireOnset, only accepts a token whose
-   articulation sound also matches. Returns the heard-token index or -1. */
-function findWord(heard, w, from, requireOnset){
-  for(let j=from; j<heard.length; j++){
-    if(rhymeClose(w.rhyme, heard[j].rhyme) && (!requireOnset || heard[j].onset===w.onset)) return j;
+// every spoken word, classified (onset may be null if it doesn't start with our sounds)
+function allWords(phrase){
+  return phrase.toLowerCase().split(/\s+/).map(classify).filter(t=>t.word.length>0);
+}
+// generous whole-word fuzzy match (for recognizer fumbles on the rest of the word)
+function wordClose(a,b){
+  const thresh = Math.max(a.length,b.length) <= 3 ? 1 : 2;
+  return lev(a,b) <= thresh;
+}
+
+/* Try to line up each target word with a heard word, in order. For every
+   target word we return one of: 'good' (right word, right sound),
+   'wrongsound' (right word, clearly the wrong sound -> coachable), or null
+   (couldn't find it). We lean hard toward hearing an attempt: if the recogniser
+   dropped/garbled the leading sound but the rest of the word matches, we give
+   the benefit of the doubt and count it as good. */
+function alignTarget(heard){
+  const want = target.contrast;
+  const out = [];
+  let from = 0;
+  for(const w of want){
+    let good = -1, goodH = null, bad = -1, badH = null;
+    for(let j=from; j<heard.length; j++){
+      const h = heard[j];
+      const rhymeM = rhymeClose(w.rhyme, h.rhyme);
+      const wholeM = wordClose(h.word, w.word);
+      // a correct hit: right sound (or the recogniser dropped the onset entirely)
+      if((h.onset === w.onset && (rhymeM || wholeM)) || (!h.onset && wholeM)){ good=j; goodH=h; break; }
+      // remember the first clear wrong-sound on this word, but keep looking for a good one
+      if(bad<0 && h.onset && h.onset !== w.onset && (rhymeM || wholeM)){ bad=j; badH=h; }
+    }
+    if(good >= 0){ out.push({status:"good", want:w, heard:goodH}); from = good + 1; }
+    else if(bad >= 0){ out.push({status:"wrongsound", want:w, heard:badH}); from = bad + 1; }
+    else { out.push({status:null, want:w}); break; }
   }
-  return -1;
+  return out;
 }
 
 /* Evaluate one heard transcript against the target's contrastive words.
@@ -480,39 +515,26 @@ function findWord(heard, w, from, requireOnset){
    still counts. We only judge the articulation of the target word itself.
    Returns 'correct' | {coach:msg} | 'unclear'  */
 function evalTranscript(text){
-  const heard = contrastTokens(text);
+  const heard = allWords(text);
   const want = target.contrast;
   if(!want.length || !heard.length) return "unclear";
 
-  // Pass 1 — favour success: can every target word be found with the RIGHT sound?
-  let from = 0, ok = true;
-  for(const w of want){
-    const idx = findWord(heard, w, from, true);
-    if(idx < 0){ ok = false; break; }
-    from = idx + 1;
-  }
-  if(ok) return "correct";
+  const aligned = alignTarget(heard);
+  if(aligned.length < want.length || aligned.some(a=>a.status===null)) return "unclear";
 
-  // Pass 2 — rhyme only: did she clearly say the target word with a WRONG sound?
-  from = 0; let firstMiss = null, found = 0;
-  for(const w of want){
-    const idx = findWord(heard, w, from, false);
-    if(idx < 0) break;
-    const h = heard[idx]; from = idx + 1; found++;
-    if(h.onset !== w.onset && !firstMiss) firstMiss = { want:w, heard:h };
-  }
-  if(found === want.length && firstMiss) return { coach: buildCoach(firstMiss.want, firstMiss.heard) };
-  return "unclear";
+  const miss = aligned.find(a=>a.status==="wrongsound");
+  if(miss) return { coach: buildCoach(miss.want, miss.heard) };
+  return "correct"; // every target word heard with the right sound
 }
 
 /* Was this transcript a reasonable attempt at the target word (right shape,
    any sound)? Used only to decide whether gentle encouragement is warranted. */
 function isAttemptClose(text){
-  const heard = contrastTokens(text);
+  const heard = allWords(text);
   if(!heard.length) return false;
   for(const w of target.contrast)
     for(const h of heard)
-      if(rhymeClose(w.rhyme, h.rhyme)) return true;
+      if(rhymeClose(w.rhyme, h.rhyme) || wordClose(h.word, w.word)) return true;
   return false;
 }
 
@@ -532,7 +554,7 @@ function initRecognition(){
   rec = new SR();
   rec.continuous = true;
   rec.interimResults = true;
-  rec.maxAlternatives = 5;
+  rec.maxAlternatives = 8;   // more guesses to match against -> easier to hear her
   rec.lang = "en-US";
 
   rec.onstart = ()=>{ recognizing = true; };
