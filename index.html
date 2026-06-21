@@ -8,7 +8,9 @@
   :root{
     --pink:#ff6fb5; --pink-soft:#ffd6ec; --blue:#4cc9ff; --yellow:#ffd23f;
     --green:#51e3a0; --purple:#b388ff; --ink:#34285a;
-    --opp:30%; /* opponent push position, set by JS */
+    /* battle-line resting positions, set by JS from state.pushback */
+    --pLeft:8%;   /* player's resting distance from left wall  */
+    --oRight:26%; /* opponent's resting distance from right wall */
   }
   *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html,body{ height:100%; margin:0; }
@@ -52,38 +54,49 @@
     border-radius:0 0 26px 26px;
   }
   .fighter{ position:absolute; bottom:12%; width:34%; max-width:240px; z-index:2; }
-  .fighter.player{ left:3%; transform-origin:bottom center; }
-  .fighter.opponent{ right:3%; transform-origin:bottom center;
-    transform:translateX(calc(var(--opp) * -1)); transition:transform .5s cubic-bezier(.5,1.6,.4,1); }
+  /* resting positions track the battle line; they glide when ground changes */
+  .fighter.player{ left:var(--pLeft); transform-origin:bottom center;
+    transition:left .6s cubic-bezier(.5,1.5,.4,1); }
+  .fighter.opponent{ right:var(--oRight); transform-origin:bottom center;
+    transition:right .6s cubic-bezier(.5,1.5,.4,1); }
   .fighter svg{ width:100%; height:auto; display:block; }
 
   /* sword swing animations */
   @keyframes swingP{ 0%{transform:rotate(0)} 30%{transform:rotate(-55deg)} 60%{transform:rotate(20deg)} 100%{transform:rotate(0)} }
   @keyframes swingO{ 0%{transform:rotate(0)} 30%{transform:rotate(55deg)} 60%{transform:rotate(-20deg)} 100%{transform:rotate(0)} }
-  .swordP.swing{ animation:swingP .5s ease-in-out 4; }
-  .swordO.swing{ animation:swingO .5s ease-in-out 5; }
+  .swordP.swing{ animation:swingP .42s ease-in-out 3; }
+  .swordO.swing{ animation:swingO .42s ease-in-out 3; }
   .swordP,.swordO{ transform-box:fill-box; transform-origin:bottom center; }
 
-  @keyframes lungeP{ 0%,100%{transform:translateX(0)} 40%{transform:translateX(28%)} }
-  @keyframes lungeO{ 0%,100%{transform:translateX(0)} 40%{transform:translateX(-18%)} }
-  .fighter.player.lunge{ animation:lungeP .55s ease-in-out 2; }
-  .fighter.opponent.hit{ animation:shake .4s ease-in-out 3; }
-  @keyframes shake{ 0%,100%{margin-bottom:0} 25%{margin-bottom:6px} 75%{margin-bottom:-6px} }
+  /* CLASH: charge to the centre, then return to the (new) resting spot */
+  @keyframes chargeP{ 0%{transform:translateX(0)} 38%{transform:translateX(50%)}
+    50%{transform:translateX(44%)} 100%{transform:translateX(0)} }
+  @keyframes chargeO{ 0%{transform:translateX(0)} 38%{transform:translateX(-50%)}
+    50%{transform:translateX(-44%)} 100%{transform:translateX(0)} }
+  /* KNOCKBACK: shoved away from the centre when struck */
+  @keyframes knockP{ 0%{transform:translateX(0)} 30%{transform:translateX(-30%)}
+    55%{transform:translateX(-14%)} 100%{transform:translateX(0)} }
+  @keyframes knockO{ 0%{transform:translateX(0)} 30%{transform:translateX(30%)}
+    55%{transform:translateX(14%)} 100%{transform:translateX(0)} }
+  .fighter.player.charge{ animation:chargeP .95s cubic-bezier(.4,0,.3,1) 1; z-index:3; }
+  .fighter.opponent.charge{ animation:chargeO .95s cubic-bezier(.4,0,.3,1) 1; z-index:3; }
+  .fighter.player.knock{ animation:knockP .9s ease-out 1; }
+  .fighter.opponent.knock{ animation:knockO .9s ease-out 1; }
 
   /* ---------- FX layer ---------- */
   #fx{ position:absolute; inset:0; pointer-events:none; z-index:5; overflow:hidden; }
   .confetti{ position:absolute; width:14px; height:14px; border-radius:3px; will-change:transform,opacity; }
   .spark{ position:absolute; font-size:34px; will-change:transform,opacity; }
-  .boom{ position:absolute; left:50%; top:50%; width:30px; height:30px; border-radius:50%;
+  .boom{ position:absolute; left:50%; top:45%; width:30px; height:30px; border-radius:50%;
     transform:translate(-50%,-50%); background:radial-gradient(circle,#fff,#ffd23f 40%,#ff6fb5 70%,transparent 72%);
-    animation:boom .6s ease-out forwards; z-index:4; }
-  @keyframes boom{ from{opacity:1; width:30px;height:30px} to{opacity:0; width:380px;height:380px} }
+    animation:boom 1.05s ease-out forwards; z-index:4; }
+  @keyframes boom{ from{opacity:1; width:30px;height:30px} 60%{opacity:1} to{opacity:0; width:460px;height:460px} }
 
   /* battle callout CHA CHA / PA PA */
   #callout{ position:absolute; top:14%; left:50%; transform:translateX(-50%);
     font-size:clamp(28px,9vw,68px); font-weight:900; color:#fff; z-index:6;
     text-shadow:0 3px 0 #ff6fb5,0 6px 0 rgba(52,40,90,.25); white-space:nowrap; opacity:0; }
-  #callout.show{ animation:pop .9s ease-out; }
+  #callout.show{ animation:pop 1.5s ease-out; }
   #callout.bad{ text-shadow:0 3px 0 #748ffc,0 6px 0 rgba(52,40,90,.25); }
   @keyframes pop{ 0%{opacity:0; transform:translateX(-50%) scale(.4)} 25%{opacity:1; transform:translateX(-50%) scale(1.1)}
     70%{opacity:1; transform:translateX(-50%) scale(1)} 100%{opacity:0; transform:translateX(-50%) scale(1)} }
@@ -311,7 +324,29 @@ function refreshUI(){
   ui.score.textContent = state.score;
   ui.streak.textContent = state.streak;
   ui.level.textContent = state.level;
-  document.documentElement.style.setProperty("--opp", state.pushback + "%");
+  applyGround();
+}
+
+/* ---- Battle-line geometry ----
+   state.pushback (18..92) is the player's territory advantage. Higher = the
+   meeting point sits further into the opponent's half. Both fighters rest a
+   fixed gap on either side of that line, so the screen always shows who is
+   winning the ground war. */
+function battleGeom(p){
+  const line = 50 + (p - 50) * 0.45;     // meeting point, % from left
+  const half = 18;                        // each fighter rests this far off the line
+  let pLeft  = (line - half) - 17;        // player centre minus half its width
+  let oRight = 100 - ((line + half) + 17);// opponent centre, expressed as right offset
+  pLeft  = Math.max(1, Math.min(42, pLeft));
+  oRight = Math.max(1, Math.min(42, oRight));
+  return { line, pLeft, oRight };
+}
+function applyGround(){
+  const g = battleGeom(state.pushback);
+  const r = document.documentElement.style;
+  r.setProperty("--pLeft", g.pLeft + "%");
+  r.setProperty("--oRight", g.oRight + "%");
+  return g;
 }
 
 /* ============================================================
@@ -467,26 +502,26 @@ function onCorrect(){
   // score & streak
   state.score++; state.streak++;
   if(state.streak>state.best) state.best=state.streak;
+  // player gains ground; this persists between rounds via saveProgress()
   state.pushback = Math.min(92, state.pushback + 12);
   refreshUI(); saveProgress();
   setStatus("YES! Perfect sword strike! 🌟", false);
 
-  // animations
+  // player charges in, strikes, opponent is knocked back to its new ground
   callout("CHA CHA CHA CHA!", false);
-  swing(ui.swordP, "swordP");
-  ui.player.classList.remove("lunge"); void ui.player.offsetWidth; ui.player.classList.add("lunge");
-  ui.opponent.classList.remove("hit"); void ui.opponent.offsetWidth; ui.opponent.classList.add("hit");
-  boom(); confetti(36); stars(10);
-  sndSuccess();
+  clash("player");
+  // celebration lingers so it's actually enjoyable to watch
+  confetti(50); stars(16);
 
   const praises = ["Great job, Samurai Sword Sensei!","Wonderful! Cha cha cha!","You got it, Sensei!","Beautiful sword strike!","Amazing speaking!"];
   const line = state.score%3===0 ? "Great job, Samurai Sword Sensei!" : praises[Math.floor(Math.random()*praises.length)];
 
   // Level up every 5 correct
   if(state.streak>0 && state.streak%5===0){
-    speak(line, ()=> levelUp());
+    speak(line, ()=> setTimeout(levelUp, 700));
   } else {
-    speak(line, ()=> setTimeout(nextRound, 350));
+    // wait for the confetti to settle before the next word appears
+    speak(line, ()=> setTimeout(nextRound, 1500));
   }
 }
 
@@ -494,14 +529,13 @@ function onCoach(msg){
   if(busy) return;
   busy = true;
   stopListening();
-  // opponent counter-attacks gently (never a real loss)
+  // opponent counter-attacks gently — player gives a little ground (never a real loss)
   state.streak = 0;
   state.pushback = Math.max(18, state.pushback - 6);
   refreshUI(); saveProgress();
 
   callout("PA PA PA PA!", true);
-  swing(ui.swordO, "swordO");
-  sndThud();
+  clash("opponent");
   showCoach(msg);
   setStatus("Let's try that sound together! 🗣️", false);
   speak(msg, ()=>{
@@ -539,9 +573,12 @@ function callout(text, bad){
 }
 function swing(el, cls){ if(!el) return; el.classList.remove("swing"); void el.offsetWidth; el.classList.add("swing"); }
 
-function boom(){
-  const b=document.createElement("div"); b.className="boom"; ui.fx.appendChild(b);
-  setTimeout(()=>b.remove(),650);
+function boom(xPct, yPct){
+  const b=document.createElement("div"); b.className="boom";
+  if(xPct!=null) b.style.left=xPct+"%";
+  if(yPct!=null) b.style.top=yPct+"%";
+  ui.fx.appendChild(b);
+  setTimeout(()=>b.remove(),1100);
 }
 const COLORS=["#ff5ba6","#ffd23f","#51e3a0","#4cc9ff","#b388ff","#ff8e3c"];
 function confetti(n){
@@ -550,13 +587,14 @@ function confetti(n){
     c.style.background=COLORS[i%COLORS.length];
     c.style.left=(50+(Math.random()*40-20))+"%";
     c.style.top="40%";
-    const dx=(Math.random()*2-1)*220, dy=-(120+Math.random()*200), rot=Math.random()*720;
+    const dx=(Math.random()*2-1)*240, dy=-(140+Math.random()*220), rot=Math.random()*720;
+    // slower fall so a 5-year-old can actually watch it settle
     c.animate([
       {transform:"translate(0,0) rotate(0)", opacity:1},
-      {transform:`translate(${dx}px,${dy}px) rotate(${rot}deg)`, opacity:1, offset:.7},
-      {transform:`translate(${dx*1.2}px,${dy+260}px) rotate(${rot}deg)`, opacity:0}
-    ], {duration:1300+Math.random()*500, easing:"cubic-bezier(.2,.7,.3,1)"});
-    ui.fx.appendChild(c); setTimeout(()=>c.remove(),1900);
+      {transform:`translate(${dx}px,${dy}px) rotate(${rot}deg)`, opacity:1, offset:.55},
+      {transform:`translate(${dx*1.2}px,${dy+320}px) rotate(${rot}deg)`, opacity:0}
+    ], {duration:2600+Math.random()*800, easing:"cubic-bezier(.2,.7,.3,1)"});
+    ui.fx.appendChild(c); setTimeout(()=>c.remove(),3500);
   }
 }
 function stars(n){
@@ -565,16 +603,35 @@ function stars(n){
     const s=document.createElement("div"); s.className="spark";
     s.textContent=E[i%E.length];
     s.style.left=(50+(Math.random()*50-25))+"%"; s.style.top=(45+(Math.random()*20-10))+"%";
-    const dx=(Math.random()*2-1)*180, dy=-(80+Math.random()*160);
+    const dx=(Math.random()*2-1)*200, dy=-(90+Math.random()*180);
     s.animate([
       {transform:"translate(0,0) scale(.4)", opacity:0},
-      {transform:`translate(${dx*.5}px,${dy*.5}px) scale(1.2)`, opacity:1, offset:.4},
+      {transform:`translate(${dx*.5}px,${dy*.5}px) scale(1.25)`, opacity:1, offset:.4},
       {transform:`translate(${dx}px,${dy}px) scale(1)`, opacity:0}
-    ], {duration:1200+Math.random()*400, easing:"ease-out"});
-    ui.fx.appendChild(s); setTimeout(()=>s.remove(),1700);
+    ], {duration:2200+Math.random()*700, easing:"ease-out"});
+    ui.fx.appendChild(s); setTimeout(()=>s.remove(),3100);
   }
 }
-function rainbowBurst(){ confetti(60); stars(18); boom(); }
+function rainbowBurst(){ confetti(90); stars(28); boom(); setTimeout(()=>{ confetti(60); stars(18); }, 700); }
+
+/* ---- Samurai clash: one fighter charges to the centre and strikes,
+   the other is knocked backward; an impact pops at the meeting line ---- */
+function clash(winner){
+  const g = battleGeom(state.pushback);
+  const charger = winner==="player" ? ui.player : ui.opponent;
+  const victim  = winner==="player" ? ui.opponent : ui.player;
+  const sword   = winner==="player" ? ui.swordP : ui.swordO;
+  [charger,victim].forEach(el=>el.classList.remove("charge","knock"));
+  void charger.offsetWidth;
+  charger.classList.add("charge");
+  victim.classList.add("knock");
+  // strike + impact land at the clash moment (~38% of the .95s charge)
+  setTimeout(()=>{
+    swing(sword, "");
+    boom(g.line, 42);
+    if(winner==="player") sndSuccess(); else sndThud();
+  }, 330);
+}
 
 /* ---- WebAudio cute sounds ---- */
 function audio(){ if(!ac){ try{ ac=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return ac; }
