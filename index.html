@@ -72,11 +72,13 @@
   #finishLine{ left:74%; border-left:5px dashed rgba(255,91,166,.65); }
   #finishLine .flag{ position:absolute; top:-7%; left:7px; font-size:clamp(22px,5.5vw,38px); }
 
-  /* sword swing: a big overhead wind-up and chop so it clearly reads */
-  @keyframes swingP{ 0%{transform:rotate(0)} 18%{transform:rotate(-95deg)}
-    50%{transform:rotate(80deg)} 72%{transform:rotate(35deg)} 100%{transform:rotate(0)} }
-  @keyframes swingO{ 0%{transform:rotate(0)} 18%{transform:rotate(95deg)}
-    50%{transform:rotate(-80deg)} 72%{transform:rotate(-35deg)} 100%{transform:rotate(0)} }
+  /* sword swing: a big forehand chop toward the FOE. The player (left) chops to
+     the right, the opponent (right) chops to the left — neither swings back
+     across its own body, so nobody hits themselves. */
+  @keyframes swingP{ 0%{transform:rotate(0)} 30%{transform:rotate(108deg)}
+    55%{transform:rotate(80deg)} 80%{transform:rotate(112deg)} 100%{transform:rotate(0)} }
+  @keyframes swingO{ 0%{transform:rotate(0)} 30%{transform:rotate(-108deg)}
+    55%{transform:rotate(-80deg)} 80%{transform:rotate(-112deg)} 100%{transform:rotate(0)} }
   .swordP.swing{ animation:swingP .6s ease-in-out 3; }
   .swordO.swing{ animation:swingO .6s ease-in-out 3; }
   .swordP,.swordO{ transform-box:fill-box; transform-origin:bottom center; }
@@ -214,6 +216,10 @@
   .sb-grid .st.new{ animation:stIn .6s ease-out; }
   @keyframes stIn{ 0%{transform:scale(0) rotate(-40deg); opacity:0} 60%{transform:scale(1.35)} 100%{transform:scale(1)} }
   .sb-empty{ font-size:11px; color:#b0a8c4; text-align:center; padding:8px 2px; line-height:1.3; }
+  #resetStickers{ margin-top:auto; margin-bottom:2px; width:42px; height:42px; border-radius:50%;
+    border:2px solid var(--purple); background:#fff; color:var(--purple); font-size:20px;
+    font-weight:900; cursor:pointer; opacity:.5; flex:none; }
+  #resetStickers:active{ transform:translateY(2px); opacity:.8; }
 </style>
 </head>
 <body>
@@ -325,6 +331,7 @@
 <aside id="stickerboard">
   <div class="sb-title">MY<br>STICKERS</div>
   <div class="sb-grid" id="sbGrid"></div>
+  <button id="resetStickers" title="Reset sticker collection" aria-label="Reset sticker collection">↺</button>
 </aside>
 
 <script>
@@ -703,14 +710,13 @@ function onCoach(msg){
 
 /* ---- Trophies & stickers ---- */
 const TROPHIES = [
-  {name:"Rainbow",  emoji:"🌈🏆"},
-  {name:"Princess", emoji:"👑🏆"},
-  {name:"Dragon",   emoji:"🐉🏆"},
-  {name:"Kitten",   emoji:"🐱🏆"},
-  {name:"Heart",    emoji:"💖🏆"},
-  {name:"Star",     emoji:"⭐🏆"},
+  {name:"Rainbow",  icon:"🌈"},
+  {name:"Princess", icon:"👑"},
+  {name:"Dragon",   icon:"🐉"},
+  {name:"Kitten",   icon:"🐱"},
+  {name:"Heart",    icon:"💖"},
+  {name:"Star",     icon:"⭐"},
 ];
-const STICKERS = ["🐱","💖","🎀","🎈","🦄","🌈","👑","🦋","🐉","⭐","🌸"];
 
 /* The opponent is pushed behind the finish line: topple + trophy screen. */
 function winBattle(){
@@ -732,7 +738,7 @@ function openTrophyScreen(){
   pool.forEach(tr=>{
     const b=document.createElement("button");
     b.className="trophy-btn";
-    b.innerHTML = `${tr.emoji}<span class="lbl">${tr.name}</span>`;
+    b.innerHTML = `${tr.icon}🏆<span class="lbl">${tr.name}</span>`;
     b.onclick=()=>chooseTrophy(tr, b);
     ui.trophyRow.appendChild(b);
   });
@@ -744,16 +750,14 @@ function openTrophyScreen(){
 function chooseTrophy(tr, btn){
   [...ui.trophyRow.children].forEach(c=>{ if(c!==btn) c.classList.add("dim"); });
   btn.classList.add("chosen");
-  // award the chosen trophy plus a couple of surprise stickers
-  const bonus = STICKERS.slice().sort(()=>Math.random()-0.5).slice(0,2);
-  const earned = [tr.emoji, ...bonus];
-  earned.forEach(e=>state.stickers.push(e));
+  // exactly ONE sticker — only the trophy she chose
+  state.stickers.push(tr.icon);
   saveProgress();
-  renderStickers(earned.length);
+  renderStickers(1);
   rainbowBurst();
-  ui.trophyReward.textContent = "You earned " + earned.join(" ");
+  ui.trophyReward.textContent = "You earned " + tr.icon;
   ui.levelContinue.classList.remove("hidden");
-  speak("Yay! New stickers for your collection!");
+  speak("Yay! A new sticker for your collection!");
 }
 
 function renderStickers(newCount){
@@ -967,6 +971,13 @@ function startGame(){
 }
 
 $("startBtn").addEventListener("click", startGame);
+$("resetStickers").addEventListener("click", ()=>{
+  if(confirm("Clear all stickers and start the collection over?")){
+    state.stickers = [];
+    saveProgress();
+    renderStickers();
+  }
+});
 ui.levelContinue.addEventListener("click", ()=>{
   ui.levelup.classList.add("hidden");
   ui.opponent.classList.remove("fallen");
