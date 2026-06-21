@@ -4,6 +4,10 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <title>Samurai Sword Sensei</title>
+<!-- Azure Speech SDK (optional upgrade): if it loads AND a token endpoint is
+     available, the game uses Azure pronunciation scoring; otherwise it falls
+     back to the browser's Web Speech API automatically. -->
+<script src="https://aka.ms/csspeech/jsbrowserpackageraw"></script>
 <style>
   :root{
     --pink:#ff6fb5; --pink-soft:#ffd6ec; --blue:#4cc9ff; --yellow:#ffd23f;
@@ -142,6 +146,20 @@
     box-shadow:0 5px 0 rgba(52,40,90,.15); animation:bubblePop .35s ease-out;
   }
   @keyframes bubblePop{ from{transform:scale(.7); opacity:0} to{transform:scale(1); opacity:1} }
+
+  /* ---------- Minimal-pair cards + closeness bar ---------- */
+  #pairs{ display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin:2px 0 8px; }
+  .pair{ background:#fff; border:3px solid #fff; border-radius:16px; padding:6px 8px 7px; width:78px;
+    box-shadow:0 4px 0 rgba(52,40,90,.12); text-align:center; transition:transform .15s, border-color .2s; }
+  .pair .pic{ font-size:clamp(24px,7vw,34px); line-height:1; }
+  .pair .lbl{ font-size:clamp(12px,3.4vw,15px); font-weight:900; letter-spacing:1px; color:var(--ink); margin-top:2px; }
+  .pair.goal{ border-color:var(--yellow); }
+  .pair.heard{ animation:heardPulse .9s ease; }
+  @keyframes heardPulse{ 0%{transform:scale(1); border-color:#ff6b6b} 30%{transform:scale(1.12); border-color:#ff6b6b} 100%{transform:scale(1)} }
+  .pair .bar{ height:10px; border-radius:6px; background:#eef0f4; margin-top:6px; overflow:hidden; visibility:hidden; }
+  .pair.goal .bar{ visibility:visible; }
+  .pair .bar > i{ display:block; height:100%; width:0%; border-radius:6px; background:#ff6b6b;
+    transition:width .45s cubic-bezier(.3,1,.4,1), background .45s; }
 
   /* ---------- Target / clue ---------- */
   .bottom{ padding:10px 12px 16px; text-align:center; }
@@ -321,6 +339,7 @@
     <div id="coach"></div>
 
     <div class="bottom">
+      <div id="pairs" class="hidden"></div>
       <div id="clue"></div>
       <div id="target">SHIP IT</div>
       <div id="status"><span class="mic-dot"></span>Tap START to play!</div>
@@ -405,6 +424,13 @@ const WIN_STEP   = 14;      // ground gained per correct word
 const LOSE_STEP  = 8;       // ground given back per wrong sound
 const GOAL       = 100;     // opponent is behind the finish line at this point
 
+/* ---- Azure pronunciation scoring (optional upgrade) ---- */
+const WIN_THRESHOLD  = 70;          // target-sound accuracy needed to win (0..100)
+const AZURE_TOKEN_URL = "/api/azure-token";
+let useAzure = false;       // true once an Azure token + SDK are ready
+let azureToken = null, azureRegion = "eastus";
+let azureRec = null, paConfig = null;
+
 /* ---- patient-listening trackers (reset each round) ---- */
 let roundStart = 0;
 let roundAttempts = 0;      // how many real spoken attempts this round
@@ -418,7 +444,7 @@ const ui = {
   target:$("target"), clue:$("clue"), status:$("status"), coach:$("coach"),
   callout:$("callout"), fx:$("fx"), player:$("player"), opponent:$("opponent"),
   swordP:document.querySelector(".swordP"), swordO:document.querySelector(".swordO"),
-  practice:$("practice"),
+  practice:$("practice"), pairs:$("pairs"),
   levelup:$("levelup"), luTitle:$("luTitle"), trophyRow:$("trophyRow"),
   trophyReward:$("trophyReward"), levelContinue:$("levelContinue"), sbGrid:$("sbGrid"),
 };
@@ -603,7 +629,7 @@ function initRecognition(){
       // a wrong SOUND on the right word -> opponent counter-attacks
       for(const a of alts){
         const r = evalTranscript(a);
-        if(r && r.coach){ onCoach(r.coach); return; }
+        if(r && r.coach){ flashHeard(heardOnsetFor(a)); onCoach(r.coach); return; }
       }
       // otherwise: just remember she tried, and how close — stay silent
       const hadSpeech = alts.some(a=>/[a-z]/i.test(a));
@@ -628,14 +654,15 @@ function startListening(){
   roundStart = Date.now();
   roundAttempts = 0;
   lastAttemptClose = false;
-  safeStart();
+  if(useAzure) azureListenStart(); else safeStart();
   armPatience();
 }
 function stopListening(){
   shouldListen = false;
   clearTimeout(silenceTimer);
   micDot(false);
-  if(rec && recognizing){ try{ rec.stop(); }catch(e){} }
+  if(useAzure) azureListenStop();
+  else if(rec && recognizing){ try{ rec.stop(); }catch(e){} }
 }
 /* Patient listening: stay silent by default. Only offer a gentle nudge when
    (1) >10s have passed, (2) she has made a real attempt, (3) that attempt was
@@ -673,6 +700,7 @@ function nextRound(){
   ui.target.classList.remove("flash"); void ui.target.offsetWidth; ui.target.classList.add("flash");
   ui.clue.textContent = pick[1];
   buildPractice();
+  buildPairs();
   startListening();
 }
 
@@ -689,6 +717,7 @@ function onCorrect(){
   setStatus("YES! Perfect sword strike! 🌟", false);
 
   // player charges in, strikes, opponent stumbles back; comic POW/BAM/WHACK!
+  setBar(100);
   callout("CHA CHA CHA CHA!", false);
   clash("player");
   confetti(40); stars(14);
@@ -976,7 +1005,7 @@ function speak(text, cb){
    ============================================================ */
 const NO_MIC = !SR;
 function buildPractice(){
-  if(!NO_MIC){ ui.practice.style.display="none"; return; }
+  if(useAzure || !NO_MIC){ ui.practice.style.display="none"; return; }
   ui.practice.style.display="flex";
   ui.practice.innerHTML="";
   // build a small set of choices: the real onset + confusables of first contrast word
@@ -1003,16 +1032,172 @@ function buildPractice(){
 }
 
 /* ============================================================
+   MINIMAL-PAIR CARDS + CLOSENESS BAR
+   ============================================================ */
+const FAMILIES = [
+  {sh:["SHIP","🚢"], ch:["CHIP","🍟"], s:["SIP","🥤"],  z:["ZIP","🤐"]},
+  {sh:["SHOP","🏪"], ch:["CHOP","🪓"], s:["SOP","🧽"]},
+  {sh:["SHEEP","🐑"],ch:["CHEAP","💰"],s:["SEEP","💧"]},
+  {sh:["SHOCK","😲"],ch:["CHOCK","🧱"],s:["SOCK","🧦"]},
+  {sh:["SHIN","🦵"], ch:["CHIN","😀"], s:["SIN","🙅"]},
+  {sh:["SHARE","🤝"],ch:["CHAIR","🪑"]},
+  {sh:["SHIPS","🚢"],ch:["CHIPS","🍟"],s:["SIPS","🥤"], z:["ZIPS","🤐"]},
+];
+const phraseFamily = {};
+FAMILIES.forEach(f=>Object.values(f).forEach(([w])=>{ phraseFamily[w]=f; }));
+
+function buildPairs(){
+  const fam = phraseFamily[target.phrase];
+  if(!fam){ ui.pairs.classList.add("hidden"); ui.pairs.innerHTML=""; return; }
+  ui.pairs.classList.remove("hidden");
+  ui.pairs.innerHTML="";
+  ["sh","ch","s","z"].forEach(o=>{
+    const item = fam[o]; if(!item) return;
+    const [word,emoji]=item;
+    const card=document.createElement("div");
+    card.className="pair"+(word===target.phrase?" goal":"");
+    card.dataset.onset=o;
+    card.innerHTML=`<div class="pic">${emoji}</div><div class="lbl">${word}</div><div class="bar"><i></i></div>`;
+    ui.pairs.appendChild(card);
+  });
+  resetBar();
+}
+function resetBar(){
+  const i=ui.pairs.querySelector(".pair.goal .bar > i");
+  if(i){ i.style.width="0%"; i.style.background="#ff6b6b"; }
+}
+function setBar(score){
+  const i=ui.pairs.querySelector(".pair.goal .bar > i"); if(!i) return;
+  const s=Math.max(0,Math.min(100,Math.round(score)));
+  i.style.width=s+"%";
+  i.style.background = s>=WIN_THRESHOLD ? "#51e3a0" : s>=40 ? "#ffd23f" : "#ff6b6b";
+}
+function flashHeard(onset){
+  if(!onset) return;
+  const c=ui.pairs.querySelector(`.pair[data-onset="${onset}"]`); if(!c) return;
+  c.classList.remove("heard"); void c.offsetWidth; c.classList.add("heard");
+}
+// which one of our four onsets did she actually produce on the target word?
+function heardOnsetFor(text){
+  const al = alignTarget(allWords(text));
+  const miss = al.find(a=>a.status==="wrongsound");
+  return miss ? miss.heard.onset : null;
+}
+
+/* ============================================================
+   AZURE PRONUNCIATION ASSESSMENT  (optional upgrade)
+   ============================================================ */
+async function fetchAzureToken(){
+  const r = await fetch(AZURE_TOKEN_URL, { method:"POST" });
+  if(!r.ok) throw new Error("token http "+r.status);
+  const j = await r.json();
+  if(!j.token) throw new Error("no token");
+  azureToken = j.token; azureRegion = j.region || "eastus";
+}
+async function initAzure(){
+  if(!window.SpeechSDK) return false;            // SDK didn't load -> Web Speech
+  try{ await fetchAzureToken(); }catch(e){ return false; }   // no backend -> Web Speech
+  // keep the short-lived token fresh
+  setInterval(()=>{ fetchAzureToken().then(()=>{ if(azureRec) azureRec.authorizationToken=azureToken; }).catch(()=>{}); }, 9*60*1000);
+  useAzure = true;
+  return true;
+}
+function azureEnsureRecognizer(){
+  if(azureRec) return azureRec;
+  const sc = SpeechSDK.SpeechConfig.fromAuthorizationToken(azureToken, azureRegion);
+  sc.speechRecognitionLanguage = "en-US";
+  const ac2 = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
+  azureRec = new SpeechSDK.SpeechRecognizer(sc, ac2);
+  azureRec.recognized = (_s, e)=>{
+    if(!e.result || e.result.reason !== SpeechSDK.ResultReason.RecognizedSpeech) return;
+    let nbest=null;
+    try{
+      const raw = e.result.properties.getProperty(SpeechSDK.PropertyId.SpeechServiceResponse_JsonResult);
+      nbest = JSON.parse(raw).NBest[0];
+    }catch(_){}
+    onAzureResult(e.result.text||"", nbest);
+  };
+  return azureRec;
+}
+function azureListenStart(){
+  try{
+    azureEnsureRecognizer();
+    azureRec.authorizationToken = azureToken;
+    // assess against THIS round's target word (miscue tolerates extra chatter)
+    paConfig = new SpeechSDK.PronunciationAssessmentConfig(
+      target.phrase,
+      SpeechSDK.PronunciationAssessmentGradingSystem.HundredMark,
+      SpeechSDK.PronunciationAssessmentGranularity.Phoneme,
+      /*enableMiscue*/ true);
+    paConfig.phonemeAlphabet = "IPA";
+    paConfig.applyTo(azureRec);
+    azureRec.startContinuousRecognitionAsync(()=>{}, ()=>{});
+  }catch(e){ /* if anything goes wrong, the round still works via patience/retry */ }
+}
+function azureListenStop(){
+  if(azureRec){ try{ azureRec.stopContinuousRecognitionAsync(()=>{}, ()=>{}); }catch(e){} }
+}
+// IPA onset -> our sound bucket
+function ipaOnset(ph){
+  if(!ph) return null;
+  if(ph.indexOf("ʃ")>=0 && ph.indexOf("t")<0) return "sh";
+  if(ph.indexOf("tʃ")>=0) return "ch";
+  if(ph==="z") return "z";
+  if(ph==="s") return "s";
+  return null;
+}
+// lowest target-onset accuracy across the target's practiced words (0..100), or null
+function onsetScoreFromNBest(nbest){
+  if(!nbest || !nbest.Words) return null;
+  const words = nbest.Words.filter(w=> (w.PronunciationAssessment&&w.PronunciationAssessment.ErrorType)!=="Insertion");
+  const scores=[];
+  for(const ct of target.contrast){
+    const m = words.find(w=>{ const c=classify(w.Word||""); return rhymeClose(c.rhyme,ct.rhyme)||wordClose(c.word,ct.word); });
+    if(m && m.Phonemes && m.Phonemes.length){
+      const pa = m.Phonemes[0].PronunciationAssessment;
+      scores.push(pa ? pa.AccuracyScore : 0);
+    }
+  }
+  return scores.length ? Math.min(...scores) : null;
+}
+function onAzureResult(text, nbest){
+  if(busy || !shouldListen) return;
+  const verdict = evalTranscript(text);           // reuse the proven word-gate
+  if(verdict === "correct"){
+    const score = onsetScoreFromNBest(nbest);     // graduated quality of the target sound
+    if(score==null){ onCorrect(); return; }       // no score available -> accept
+    setBar(score);
+    if(score >= WIN_THRESHOLD){ onCorrect(); }
+    else {                                          // right word, sound not strong enough yet
+      const nm = ONSET[target.contrast[0].onset];
+      setStatus("So close! Make that "+(nm?nm.want:"sound")+" — try again! 💪", true);
+    }
+    return;
+  }
+  if(verdict && verdict.coach){
+    flashHeard(heardOnsetFor(text));
+    onCoach(verdict.coach);
+    return;
+  }
+  // free talk / questions / noise -> ignore, just note a close attempt for patience
+  if(/[a-z]/i.test(text) && isAttemptClose(text)){ roundAttempts++; lastAttemptClose=true; }
+}
+
+/* ============================================================
    START
    ============================================================ */
-function startGame(){
+async function startGame(){
   $("startOverlay").classList.add("hidden");
   audio(); if(ac && ac.state==="suspended") ac.resume();
   // unlock TTS on iOS with a tiny silent prime
   speak("Let's play! Samurai Sword Sensei!");
   refreshUI();
-  if(SR){ initRecognition(); }
-  else { setStatus("Tap the word you said! 👇", false); }
+  let azureOk = false;
+  try{ azureOk = await initAzure(); }catch(e){}
+  if(!azureOk){
+    if(SR){ initRecognition(); }
+    else { setStatus("Tap the word you said! 👇", false); }
+  }
   setTimeout(nextRound, 600);
 }
 
