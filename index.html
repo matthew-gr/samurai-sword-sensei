@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Samurai Sword Sensei</title>
+<style>
+  :root{
+    --pink:#ff6fb5; --pink-soft:#ffd6ec; --blue:#4cc9ff; --yellow:#ffd23f;
+    --green:#51e3a0; --purple:#b388ff; --ink:#34285a;
+    --opp:30%; /* opponent push position, set by JS */
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ height:100%; margin:0; }
+  body{
+    font-family:"Comic Sans MS","Baloo 2",system-ui,-apple-system,"Segoe UI",sans-serif;
+    color:var(--ink);
+    background:
+      radial-gradient(120% 90% at 50% -10%, #fff7ad 0%, transparent 45%),
+      linear-gradient(180deg,#9be7ff 0%, #c9b8ff 45%, #ffd6ec 100%);
+    overflow:hidden; user-select:none; touch-action:manipulation;
+  }
+  #app{ height:100dvh; display:flex; flex-direction:column; }
+
+  /* ---------- Top scoreboard ---------- */
+  header{
+    display:flex; gap:10px; justify-content:center; align-items:center;
+    padding:10px 8px; flex-wrap:wrap;
+  }
+  .chip{
+    background:#fff; border-radius:999px; padding:8px 16px;
+    font-size:clamp(16px,4.5vw,26px); font-weight:800;
+    box-shadow:0 4px 0 rgba(52,40,90,.18); display:flex; align-items:center; gap:8px;
+    border:3px solid #fff;
+  }
+  .chip.score{ color:#e8590c; } .chip.streak{ color:#c2255c; } .chip.level{ color:#2f9e44; }
+
+  /* ---------- Arena ---------- */
+  .arena{ flex:1; display:flex; flex-direction:column; min-height:0; }
+  .stage{
+    position:relative; flex:1; min-height:0; overflow:hidden;
+    margin:0 6px; border-radius:28px;
+    background:
+      radial-gradient(140% 120% at 50% 120%, #b6f5c8 0%, #87e1f7 60%, transparent 61%),
+      linear-gradient(180deg,#bdefff,#e9f7ff);
+    box-shadow:inset 0 -14px 0 rgba(81,227,160,.35), 0 8px 0 rgba(52,40,90,.12);
+  }
+  /* ground */
+  .stage::after{
+    content:""; position:absolute; left:0; right:0; bottom:0; height:18%;
+    background:linear-gradient(180deg,#7be29a,#3ec77f);
+    border-radius:0 0 26px 26px;
+  }
+  .fighter{ position:absolute; bottom:12%; width:34%; max-width:240px; z-index:2; }
+  .fighter.player{ left:3%; transform-origin:bottom center; }
+  .fighter.opponent{ right:3%; transform-origin:bottom center;
+    transform:translateX(calc(var(--opp) * -1)); transition:transform .5s cubic-bezier(.5,1.6,.4,1); }
+  .fighter svg{ width:100%; height:auto; display:block; }
+
+  /* sword swing animations */
+  @keyframes swingP{ 0%{transform:rotate(0)} 30%{transform:rotate(-55deg)} 60%{transform:rotate(20deg)} 100%{transform:rotate(0)} }
+  @keyframes swingO{ 0%{transform:rotate(0)} 30%{transform:rotate(55deg)} 60%{transform:rotate(-20deg)} 100%{transform:rotate(0)} }
+  .swordP.swing{ animation:swingP .5s ease-in-out 4; }
+  .swordO.swing{ animation:swingO .5s ease-in-out 5; }
+  .swordP,.swordO{ transform-box:fill-box; transform-origin:bottom center; }
+
+  @keyframes lungeP{ 0%,100%{transform:translateX(0)} 40%{transform:translateX(28%)} }
+  @keyframes lungeO{ 0%,100%{transform:translateX(0)} 40%{transform:translateX(-18%)} }
+  .fighter.player.lunge{ animation:lungeP .55s ease-in-out 2; }
+  .fighter.opponent.hit{ animation:shake .4s ease-in-out 3; }
+  @keyframes shake{ 0%,100%{margin-bottom:0} 25%{margin-bottom:6px} 75%{margin-bottom:-6px} }
+
+  /* ---------- FX layer ---------- */
+  #fx{ position:absolute; inset:0; pointer-events:none; z-index:5; overflow:hidden; }
+  .confetti{ position:absolute; width:14px; height:14px; border-radius:3px; will-change:transform,opacity; }
+  .spark{ position:absolute; font-size:34px; will-change:transform,opacity; }
+  .boom{ position:absolute; left:50%; top:50%; width:30px; height:30px; border-radius:50%;
+    transform:translate(-50%,-50%); background:radial-gradient(circle,#fff,#ffd23f 40%,#ff6fb5 70%,transparent 72%);
+    animation:boom .6s ease-out forwards; z-index:4; }
+  @keyframes boom{ from{opacity:1; width:30px;height:30px} to{opacity:0; width:380px;height:380px} }
+
+  /* battle callout CHA CHA / PA PA */
+  #callout{ position:absolute; top:14%; left:50%; transform:translateX(-50%);
+    font-size:clamp(28px,9vw,68px); font-weight:900; color:#fff; z-index:6;
+    text-shadow:0 3px 0 #ff6fb5,0 6px 0 rgba(52,40,90,.25); white-space:nowrap; opacity:0; }
+  #callout.show{ animation:pop .9s ease-out; }
+  #callout.bad{ text-shadow:0 3px 0 #748ffc,0 6px 0 rgba(52,40,90,.25); }
+  @keyframes pop{ 0%{opacity:0; transform:translateX(-50%) scale(.4)} 25%{opacity:1; transform:translateX(-50%) scale(1.1)}
+    70%{opacity:1; transform:translateX(-50%) scale(1)} 100%{opacity:0; transform:translateX(-50%) scale(1)} }
+
+  /* ---------- Coach bubble ---------- */
+  #coach{ margin:8px 14px 0; min-height:0; }
+  #coach .bubble{
+    background:#fff; border:4px solid var(--purple); border-radius:22px;
+    padding:12px 16px; font-size:clamp(16px,4.4vw,24px); font-weight:700; text-align:center;
+    box-shadow:0 5px 0 rgba(52,40,90,.15); animation:bubblePop .35s ease-out;
+  }
+  @keyframes bubblePop{ from{transform:scale(.7); opacity:0} to{transform:scale(1); opacity:1} }
+
+  /* ---------- Target / clue ---------- */
+  .bottom{ padding:10px 12px 16px; text-align:center; }
+  #clue{ font-size:clamp(40px,16vw,120px); line-height:1; min-height:0; height:0; opacity:0;
+    transition:height .3s, opacity .3s; }
+  #clue.show{ height:auto; opacity:1; margin-bottom:6px; animation:cluePop .5s ease-out; }
+  @keyframes cluePop{ 0%{transform:scale(0) rotate(-20deg)} 70%{transform:scale(1.15)} 100%{transform:scale(1)} }
+  #target{
+    font-size:clamp(40px,13vw,96px); font-weight:900; letter-spacing:2px; color:var(--ink);
+    -webkit-text-stroke:3px #fff; paint-order:stroke fill; text-shadow:0 5px 0 rgba(255,210,63,.9);
+    line-height:1.05;
+  }
+  #target.flash{ animation:flash .5s ease; }
+  @keyframes flash{ 50%{transform:scale(1.08); color:#2f9e44} }
+  #status{ font-size:clamp(16px,4.6vw,26px); font-weight:800; margin-top:8px; color:#5f3dc4; min-height:1.4em; }
+
+  /* mic listening pulse */
+  .mic-dot{ display:inline-block; width:16px; height:16px; border-radius:50%; background:#ff3b3b; margin-right:8px; vertical-align:middle; }
+  .mic-dot.on{ animation:pulse 1s infinite; }
+  @keyframes pulse{ 0%,100%{transform:scale(1); opacity:1} 50%{transform:scale(1.5); opacity:.5} }
+
+  .practice{ display:none; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:10px; }
+  .practice button{ font:inherit; font-weight:800; font-size:clamp(16px,4.5vw,22px);
+    border:none; border-radius:16px; padding:12px 18px; background:#fff; color:var(--ink);
+    box-shadow:0 5px 0 rgba(52,40,90,.18); cursor:pointer; }
+  .practice button:active{ transform:translateY(3px); box-shadow:0 2px 0 rgba(52,40,90,.18); }
+
+  /* ---------- Overlays ---------- */
+  .overlay{ position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center; padding:24px; z-index:50; background:linear-gradient(180deg,rgba(155,231,255,.96),rgba(255,214,236,.97)); }
+  .overlay.hidden{ display:none; }
+  .overlay h1{ font-size:clamp(34px,10vw,72px); margin:0 0 6px; color:var(--ink);
+    -webkit-text-stroke:3px #fff; paint-order:stroke fill; text-shadow:0 6px 0 var(--pink); }
+  .overlay p{ font-size:clamp(18px,5vw,28px); font-weight:700; max-width:620px; }
+  .big-btn{ font:inherit; font-weight:900; font-size:clamp(26px,8vw,46px); color:#fff; cursor:pointer;
+    border:none; border-radius:28px; padding:18px 42px; margin-top:18px;
+    background:linear-gradient(180deg,#ff8ec9,#ff5ba6); box-shadow:0 9px 0 #d6337e, 0 14px 22px rgba(214,51,126,.4);
+    transition:transform .08s; }
+  .big-btn:active{ transform:translateY(6px); box-shadow:0 3px 0 #d6337e; }
+  .emoji-row{ font-size:clamp(40px,14vw,90px); }
+
+  /* Level up overlay */
+  #levelup{ z-index:60; }
+  #levelup .rainbow{ font-size:clamp(34px,9vw,64px); font-weight:900;
+    background:linear-gradient(90deg,#ff5ba6,#ffd23f,#51e3a0,#4cc9ff,#b388ff);
+    -webkit-background-clip:text; background-clip:text; color:transparent; animation:wob 1s ease infinite; }
+  @keyframes wob{ 0%,100%{transform:rotate(-3deg) scale(1)} 50%{transform:rotate(3deg) scale(1.06)} }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="chip score">⭐ <span id="ui-score">0</span></div>
+    <div class="chip streak">🔥 <span id="ui-streak">0</span></div>
+    <div class="chip level">🏆 <span id="ui-level">1</span></div>
+  </header>
+
+  <div class="arena">
+    <div class="stage" id="stage">
+      <!-- PLAYER (girl) -->
+      <div class="fighter player" id="player">
+        <svg viewBox="0 0 200 240" aria-label="player">
+          <!-- balloon sword -->
+          <g class="swordP">
+            <rect x="150" y="40" width="26" height="150" rx="13" fill="#ff5ba6" stroke="#34285a" stroke-width="4"/>
+            <circle cx="163" cy="195" r="12" fill="#ffd23f" stroke="#34285a" stroke-width="4"/>
+          </g>
+          <!-- pigtails -->
+          <circle cx="55" cy="55" r="20" fill="#7b4b2a" stroke="#34285a" stroke-width="4"/>
+          <circle cx="125" cy="55" r="20" fill="#7b4b2a" stroke="#34285a" stroke-width="4"/>
+          <!-- head -->
+          <circle cx="90" cy="60" r="34" fill="#ffe0bd" stroke="#34285a" stroke-width="5"/>
+          <circle cx="78" cy="60" r="4.5" fill="#34285a"/>
+          <circle cx="102" cy="60" r="4.5" fill="#34285a"/>
+          <circle cx="70" cy="72" r="6" fill="#ff9ec4" opacity=".7"/>
+          <circle cx="110" cy="72" r="6" fill="#ff9ec4" opacity=".7"/>
+          <path d="M76 74 q14 14 28 0" fill="none" stroke="#34285a" stroke-width="4" stroke-linecap="round"/>
+          <!-- bow -->
+          <path d="M90 28 l-12 -10 v20 z" fill="#ff5ba6" stroke="#34285a" stroke-width="3"/>
+          <path d="M90 28 l12 -10 v20 z" fill="#ff5ba6" stroke="#34285a" stroke-width="3"/>
+          <!-- body / dress -->
+          <path d="M90 94 L60 180 L120 180 Z" fill="#ff8ec9" stroke="#34285a" stroke-width="5" stroke-linejoin="round"/>
+          <!-- arms -->
+          <path d="M90 120 L150 110" fill="none" stroke="#34285a" stroke-width="6" stroke-linecap="round"/>
+          <path d="M90 120 L48 140" fill="none" stroke="#34285a" stroke-width="6" stroke-linecap="round"/>
+          <!-- legs -->
+          <path d="M80 180 L72 220" stroke="#34285a" stroke-width="6" stroke-linecap="round"/>
+          <path d="M100 180 L108 220" stroke="#34285a" stroke-width="6" stroke-linecap="round"/>
+        </svg>
+      </div>
+
+      <!-- OPPONENT -->
+      <div class="fighter opponent" id="opponent">
+        <svg viewBox="0 0 200 240" aria-label="opponent">
+          <g class="swordO">
+            <rect x="24" y="40" width="26" height="150" rx="13" fill="#4cc9ff" stroke="#34285a" stroke-width="4"/>
+            <circle cx="37" cy="195" r="12" fill="#51e3a0" stroke="#34285a" stroke-width="4"/>
+          </g>
+          <!-- headband -->
+          <path d="M76 36 q34 -16 68 0" fill="none" stroke="#7048e8" stroke-width="8" stroke-linecap="round"/>
+          <!-- head -->
+          <circle cx="110" cy="60" r="34" fill="#d8f5a2" stroke="#34285a" stroke-width="5"/>
+          <circle cx="98" cy="60" r="4.5" fill="#34285a"/>
+          <circle cx="122" cy="60" r="4.5" fill="#34285a"/>
+          <path d="M98 80 q12 8 24 0" fill="none" stroke="#34285a" stroke-width="4" stroke-linecap="round"/>
+          <!-- body -->
+          <rect x="92" y="94" width="36" height="80" rx="14" fill="#74c0fc" stroke="#34285a" stroke-width="5"/>
+          <!-- arms -->
+          <path d="M110 120 L50 110" fill="none" stroke="#34285a" stroke-width="6" stroke-linecap="round"/>
+          <path d="M110 120 L150 140" fill="none" stroke="#34285a" stroke-width="6" stroke-linecap="round"/>
+          <!-- legs -->
+          <path d="M100 174 L92 220" stroke="#34285a" stroke-width="6" stroke-linecap="round"/>
+          <path d="M120 174 L128 220" stroke="#34285a" stroke-width="6" stroke-linecap="round"/>
+        </svg>
+      </div>
+
+      <div id="callout"></div>
+      <div id="fx"></div>
+    </div>
+
+    <div id="coach"></div>
+
+    <div class="bottom">
+      <div id="clue"></div>
+      <div id="target">SHIP IT</div>
+      <div id="status"><span class="mic-dot"></span>Tap START to play!</div>
+      <div class="practice" id="practice"></div>
+    </div>
+  </div>
+</div>
+
+<!-- START overlay -->
+<div class="overlay" id="startOverlay">
+  <h1>🥷 Samurai Sword Sensei 🗡️</h1>
+  <p>Say the word out loud with your best sound, and your balloon sword goes <b>CHA&nbsp;CHA&nbsp;CHA!</b> 💥<br>Listen for the <b>SH</b>, <b>CH</b>, <b>S</b>, and <b>Z</b> sounds!</p>
+  <button class="big-btn" id="startBtn">START! 🎤</button>
+  <p style="font-size:16px;opacity:.8;margin-top:14px;">We'll ask to use the microphone so we can hear your awesome voice.</p>
+</div>
+
+<!-- Level up overlay -->
+<div class="overlay hidden" id="levelup">
+  <div class="rainbow">SAMURAI SWORD SENSEI<br>LEVEL UP!</div>
+  <div class="emoji-row">🏆 ⭐ 🌈 ⭐ 🏆</div>
+  <button class="big-btn" id="levelContinue">KEEP GOING! ✨</button>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ============================================================
+   WORD LIST  (phrase, emoji picture clue)
+   ============================================================ */
+const WORDS = [
+  ["SHIP IT","🚢"],["CHIP IT","🍟"],["SIP IT","🥤"],["ZIP IT","🤐"],
+  ["SHIP","🚢"],["CHIP","🍟"],["SIP","🥤"],["ZIP","🤐"],
+  ["SHOP","🏪"],["CHOP","🪓"],["SOP","🧽"],
+  ["SHEEP","🐑"],["CHEAP","💰"],["SEEP","💧"],
+  ["SHOCK","😲"],["CHOCK","🧱"],["SOCK","🧦"],
+  ["SHIN","🦵"],["CHIN","😀"],["SIN","🙅"],
+  ["SHARE","🤝"],["CHAIR","🪑"],
+  ["SHIPS","🚢"],["CHIPS","🍟"],["SIPS","🥤"],["ZIPS","🤐"],
+  ["SHE SHIPS CHIPS","🚢🍟"],
+  ["ZIP THE SHIP","🤐🚢"],
+  ["CHEAP SHEEP","💰🐑"],
+  ["CHIP THE SHIP","🍟🚢"],
+];
+
+/* ============================================================
+   SOUND ONSET HELP  (for coaching)
+   ============================================================ */
+const ONSET = {
+  sh:{ note:"the soft SHHH sound",      want:"the quiet SHHH sound",      demo:"finger on your lips: SHHHHH" },
+  ch:{ note:"the choo-choo CH sound",   want:"the choo-choo CH sound",    demo:"a little train: CH-CH-CH" },
+  s: { note:"the snake SSSS sound",     want:"the hissing snake SSSS",    demo:"be a snake: SSSSS" },
+  z: { note:"the buzzy ZZZZ sound",     want:"the buzzy bee ZZZZ sound",  demo:"be a bee: ZZZZZ" },
+};
+const INTROS = ["Good try!","Nice try!","Almost!","So close!","Great effort!"];
+
+/* ============================================================
+   STATE
+   ============================================================ */
+const SAVE_KEY = "sss_progress_v1";
+let state = loadProgress();
+let target = null;          // {phrase, clue, contrast:[{word,onset,rhyme}]}
+let lastPhrase = null;
+let busy = false;           // animating / speaking -> not evaluating
+let shouldListen = false;
+let recognizing = false;
+let silenceTimer = null;
+let rec = null;             // SpeechRecognition
+let ac = null;              // AudioContext
+
+/* ---------- DOM ---------- */
+const $ = id => document.getElementById(id);
+const ui = {
+  score:$("ui-score"), streak:$("ui-streak"), level:$("ui-level"),
+  target:$("target"), clue:$("clue"), status:$("status"), coach:$("coach"),
+  callout:$("callout"), fx:$("fx"), player:$("player"), opponent:$("opponent"),
+  swordP:document.querySelector(".swordP"), swordO:document.querySelector(".swordO"),
+  practice:$("practice"),
+};
+
+/* ============================================================
+   PROGRESS SAVE / LOAD
+   ============================================================ */
+function loadProgress(){
+  try{ const s=JSON.parse(localStorage.getItem(SAVE_KEY)); if(s) return s; }catch(e){}
+  return { score:0, streak:0, best:0, level:1, pushback:30 };
+}
+function saveProgress(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(state)); }catch(e){} }
+function refreshUI(){
+  ui.score.textContent = state.score;
+  ui.streak.textContent = state.streak;
+  ui.level.textContent = state.level;
+  document.documentElement.style.setProperty("--opp", state.pushback + "%");
+}
+
+/* ============================================================
+   WORD ANALYSIS  (SH / CH / S / Z onset detection)
+   ============================================================ */
+function classify(word){
+  word = (word||"").toLowerCase().replace(/[^a-z]/g,"");
+  let onset=null, rhyme=word;
+  if(word.startsWith("sh")){ onset="sh"; rhyme=word.slice(2); }
+  else if(word.startsWith("ch")){ onset="ch"; rhyme=word.slice(2); }
+  else if(word.startsWith("z")){ onset="z"; rhyme=word.slice(1); }
+  else if(word.startsWith("s")){ onset="s"; rhyme=word.slice(1); }
+  return { word, onset, rhyme };
+}
+// contrastive tokens = words that START with one of our four sounds
+function contrastTokens(phrase){
+  return phrase.toLowerCase().split(/\s+/).map(classify).filter(t=>t.onset);
+}
+function lev(a,b){
+  const m=a.length,n=b.length; if(!m) return n; if(!n) return m;
+  let prev=Array.from({length:n+1},(_,i)=>i), cur=new Array(n+1);
+  for(let i=1;i<=m;i++){ cur[0]=i;
+    for(let j=1;j<=n;j++){
+      const cost=a[i-1]===b[j-1]?0:1;
+      cur[j]=Math.min(prev[j]+1, cur[j-1]+1, prev[j-1]+cost);
+    }
+    [prev,cur]=[cur,prev];
+  }
+  return prev[n];
+}
+function rhymeClose(a,b){
+  const thresh = Math.max(a.length,b.length) <= 2 ? 1 : 2;
+  return lev(a,b) <= thresh;
+}
+
+/* Evaluate one heard transcript against the target's contrastive words.
+   Returns 'correct' | {coach:msg} | 'unclear'  */
+function evalTranscript(text){
+  const heard = contrastTokens(text);
+  const want = target.contrast;
+  if(heard.length < want.length) return "unclear";      // didn't say the whole thing yet
+
+  // align in order (the contrast words always appear in order)
+  let firstMiss = null, allMatch = true;
+  for(let i=0;i<want.length;i++){
+    const w = want[i], h = heard[i];
+    if(!rhymeClose(w.rhyme, h.rhyme)){ allMatch=false; continue; } // not the right word -> ignore noise
+    if(h.onset === w.onset){ /* good for this word */ }
+    else { allMatch=false; if(!firstMiss) firstMiss={want:w, heard:h}; }
+  }
+  if(allMatch && want.length) return "correct";
+  if(firstMiss) return { coach: buildCoach(firstMiss.want, firstMiss.heard) };
+  return "unclear";
+}
+
+function buildCoach(want, heard){
+  const intro = INTROS[Math.floor(Math.random()*INTROS.length)];
+  const w = ONSET[want.onset], h = ONSET[heard.onset];
+  const tw = want.word.toUpperCase(), hw = heard.word.toUpperCase();
+  return `${intro} That sounded like "${hw}" — ${h.note}. For "${tw}", we want ${w.want}. Try it: ${w.demo} … then say ${tw}!`;
+}
+
+/* ============================================================
+   SPEECH RECOGNITION
+   ============================================================ */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+function initRecognition(){
+  if(!SR) return false;
+  rec = new SR();
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.maxAlternatives = 5;
+  rec.lang = "en-US";
+
+  rec.onstart = ()=>{ recognizing = true; };
+  rec.onerror = (e)=>{ /* no-permission or no-speech: keep calm */ };
+  rec.onend = ()=>{
+    recognizing = false;
+    if(shouldListen) setTimeout(safeStart, 250);
+  };
+  rec.onresult = (ev)=>{
+    if(busy || !shouldListen) return;
+    const res = ev.results[ev.results.length-1];
+    const alts = [];
+    for(let i=0;i<res.length;i++) alts.push(res[i].transcript);
+
+    // Favor SUCCESS: if ANY alternative is correct -> win.
+    for(const a of alts){ if(evalTranscript(a)==="correct"){ onCorrect(); return; } }
+
+    // Only act on coaching for FINAL results (avoid premature scolding).
+    if(res.isFinal){
+      for(const a of alts){
+        const r = evalTranscript(a);
+        if(r && r.coach){ onCoach(r.coach); return; }
+      }
+    }
+  };
+  return true;
+}
+function safeStart(){
+  if(!rec || recognizing || !shouldListen) return;
+  try{ rec.start(); }catch(e){ /* already started */ }
+}
+function startListening(){
+  shouldListen = true;
+  busy = false;
+  micDot(true);
+  setStatus("Listening… say it loud and proud! 🎤", true);
+  safeStart();
+  armSilence();
+}
+function stopListening(){
+  shouldListen = false;
+  clearTimeout(silenceTimer);
+  micDot(false);
+  if(rec && recognizing){ try{ rec.stop(); }catch(e){} }
+}
+function armSilence(){
+  clearTimeout(silenceTimer);
+  silenceTimer = setTimeout(()=>{
+    if(busy || !shouldListen) return;
+    showClue();
+    setStatus("Here's a picture to help. You can do it! 💪", true);
+    speak("Take your time. You can do it!"); // never names the answer
+    armSilence(); // keep gently waiting
+  }, 6500);
+}
+
+/* ============================================================
+   ROUND FLOW
+   ============================================================ */
+function nextRound(){
+  busy = false;
+  clearCoach();
+  hideClue();
+  // random, no immediate repeat
+  let pick;
+  do { pick = WORDS[Math.floor(Math.random()*WORDS.length)]; }
+  while(WORDS.length>1 && pick[0]===lastPhrase);
+  lastPhrase = pick[0];
+  target = { phrase:pick[0], clue:pick[1], contrast:contrastTokens(pick[0]) };
+  ui.target.textContent = pick[0];
+  ui.target.classList.remove("flash"); void ui.target.offsetWidth; ui.target.classList.add("flash");
+  ui.clue.textContent = pick[1];
+  buildPractice();
+  startListening();
+}
+
+function onCorrect(){
+  if(busy) return;
+  busy = true;
+  stopListening();
+  // score & streak
+  state.score++; state.streak++;
+  if(state.streak>state.best) state.best=state.streak;
+  state.pushback = Math.min(92, state.pushback + 12);
+  refreshUI(); saveProgress();
+  setStatus("YES! Perfect sword strike! 🌟", false);
+
+  // animations
+  callout("CHA CHA CHA CHA!", false);
+  swing(ui.swordP, "swordP");
+  ui.player.classList.remove("lunge"); void ui.player.offsetWidth; ui.player.classList.add("lunge");
+  ui.opponent.classList.remove("hit"); void ui.opponent.offsetWidth; ui.opponent.classList.add("hit");
+  boom(); confetti(36); stars(10);
+  sndSuccess();
+
+  const praises = ["Great job, Samurai Sword Sensei!","Wonderful! Cha cha cha!","You got it, Sensei!","Beautiful sword strike!","Amazing speaking!"];
+  const line = state.score%3===0 ? "Great job, Samurai Sword Sensei!" : praises[Math.floor(Math.random()*praises.length)];
+
+  // Level up every 5 correct
+  if(state.streak>0 && state.streak%5===0){
+    speak(line, ()=> levelUp());
+  } else {
+    speak(line, ()=> setTimeout(nextRound, 350));
+  }
+}
+
+function onCoach(msg){
+  if(busy) return;
+  busy = true;
+  stopListening();
+  // opponent counter-attacks gently (never a real loss)
+  state.streak = 0;
+  state.pushback = Math.max(18, state.pushback - 6);
+  refreshUI(); saveProgress();
+
+  callout("PA PA PA PA!", true);
+  swing(ui.swordO, "swordO");
+  sndThud();
+  showCoach(msg);
+  setStatus("Let's try that sound together! 🗣️", false);
+  speak(msg, ()=>{
+    // unlimited retries, same word, no punishment
+    busy = false;
+    startListening();
+  });
+}
+
+function levelUp(){
+  state.level++;
+  saveProgress(); refreshUI();
+  sndFanfare();
+  rainbowBurst();
+  $("levelup").classList.remove("hidden");
+  speak("Samurai Sword Sensei Level Up!");
+}
+
+/* ============================================================
+   VISUAL / AUDIO FX
+   ============================================================ */
+function setStatus(t, listening){ ui.status.innerHTML = `<span class="mic-dot${listening?' on':''}"></span>${t}`; }
+function micDot(on){ const d=ui.status.querySelector(".mic-dot"); if(d) d.classList.toggle("on",on); }
+
+function showClue(){ ui.clue.classList.add("show"); }
+function hideClue(){ ui.clue.classList.remove("show"); }
+
+function showCoach(msg){ ui.coach.innerHTML = `<div class="bubble">🥋 ${msg}</div>`; }
+function clearCoach(){ ui.coach.innerHTML = ""; }
+
+function callout(text, bad){
+  ui.callout.textContent = text;
+  ui.callout.classList.toggle("bad", !!bad);
+  ui.callout.classList.remove("show"); void ui.callout.offsetWidth; ui.callout.classList.add("show");
+}
+function swing(el, cls){ if(!el) return; el.classList.remove("swing"); void el.offsetWidth; el.classList.add("swing"); }
+
+function boom(){
+  const b=document.createElement("div"); b.className="boom"; ui.fx.appendChild(b);
+  setTimeout(()=>b.remove(),650);
+}
+const COLORS=["#ff5ba6","#ffd23f","#51e3a0","#4cc9ff","#b388ff","#ff8e3c"];
+function confetti(n){
+  for(let i=0;i<n;i++){
+    const c=document.createElement("div"); c.className="confetti";
+    c.style.background=COLORS[i%COLORS.length];
+    c.style.left=(50+(Math.random()*40-20))+"%";
+    c.style.top="40%";
+    const dx=(Math.random()*2-1)*220, dy=-(120+Math.random()*200), rot=Math.random()*720;
+    c.animate([
+      {transform:"translate(0,0) rotate(0)", opacity:1},
+      {transform:`translate(${dx}px,${dy}px) rotate(${rot}deg)`, opacity:1, offset:.7},
+      {transform:`translate(${dx*1.2}px,${dy+260}px) rotate(${rot}deg)`, opacity:0}
+    ], {duration:1300+Math.random()*500, easing:"cubic-bezier(.2,.7,.3,1)"});
+    ui.fx.appendChild(c); setTimeout(()=>c.remove(),1900);
+  }
+}
+function stars(n){
+  const E=["⭐","✨","🌟","💫"];
+  for(let i=0;i<n;i++){
+    const s=document.createElement("div"); s.className="spark";
+    s.textContent=E[i%E.length];
+    s.style.left=(50+(Math.random()*50-25))+"%"; s.style.top=(45+(Math.random()*20-10))+"%";
+    const dx=(Math.random()*2-1)*180, dy=-(80+Math.random()*160);
+    s.animate([
+      {transform:"translate(0,0) scale(.4)", opacity:0},
+      {transform:`translate(${dx*.5}px,${dy*.5}px) scale(1.2)`, opacity:1, offset:.4},
+      {transform:`translate(${dx}px,${dy}px) scale(1)`, opacity:0}
+    ], {duration:1200+Math.random()*400, easing:"ease-out"});
+    ui.fx.appendChild(s); setTimeout(()=>s.remove(),1700);
+  }
+}
+function rainbowBurst(){ confetti(60); stars(18); boom(); }
+
+/* ---- WebAudio cute sounds ---- */
+function audio(){ if(!ac){ try{ ac=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return ac; }
+function tone(freq,start,dur,type,vol){
+  const a=audio(); if(!a) return;
+  const o=a.createOscillator(), g=a.createGain();
+  o.type=type||"sine"; o.frequency.value=freq;
+  const t=a.currentTime+start;
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.exponentialRampToValueAtTime(vol||0.25, t+0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+  o.connect(g).connect(a.destination); o.start(t); o.stop(t+dur+0.02);
+}
+function sndSuccess(){ [523,659,784,1046].forEach((f,i)=>tone(f, i*0.08, 0.18, "triangle", 0.25)); }
+function sndThud(){ for(let i=0;i<4;i++) tone(180-i*10, i*0.09, 0.12, "square", 0.16); }
+function sndFanfare(){ [523,659,784,1046,1318].forEach((f,i)=>tone(f,i*0.12,0.3,"triangle",0.28)); tone(1568,0.6,0.5,"triangle",0.28); }
+
+/* ---- Speech synthesis (encourager) ---- */
+let voice=null;
+function pickVoice(){
+  const vs=speechSynthesis.getVoices();
+  voice = vs.find(v=>/female|samantha|zira|google us english|karen|tessa/i.test(v.name))
+       || vs.find(v=>/en[-_]/i.test(v.lang)) || vs[0] || null;
+}
+if("speechSynthesis" in window){ pickVoice(); speechSynthesis.onvoiceschanged=pickVoice; }
+function speak(text, cb){
+  if(!("speechSynthesis" in window)){ if(cb) setTimeout(cb,900); return; }
+  try{ speechSynthesis.cancel(); }catch(e){}
+  const u=new SpeechSynthesisUtterance(text);
+  if(voice) u.voice=voice;
+  u.rate=0.95; u.pitch=1.25; u.volume=1;
+  let done=false; const finish=()=>{ if(done) return; done=true; if(cb) cb(); };
+  u.onend=finish; u.onerror=finish;
+  // safety timeout in case onend never fires
+  setTimeout(finish, Math.min(9000, 1400 + text.length*55));
+  speechSynthesis.speak(u);
+}
+
+/* ============================================================
+   PRACTICE BUTTONS (fallback when no microphone support)
+   ============================================================ */
+const NO_MIC = !SR;
+function buildPractice(){
+  if(!NO_MIC){ ui.practice.style.display="none"; return; }
+  ui.practice.style.display="flex";
+  ui.practice.innerHTML="";
+  // build a small set of choices: the real onset + confusables of first contrast word
+  const first = target.contrast[0];
+  const opts = new Set([target.phrase]);
+  // sibling words for the first contrast position
+  ["sh","ch","s","z"].forEach(o=>{
+    if(o===first.onset) return;
+    const sib = (o==="sh"||o==="ch"? o : o) + first.rhyme;
+    const swapped = target.phrase.toLowerCase().replace(first.word, sib).toUpperCase();
+    opts.add(swapped);
+  });
+  [...opts].sort(()=>Math.random()-0.5).forEach(label=>{
+    const b=document.createElement("button");
+    b.textContent="🗣️ "+label;
+    b.onclick=()=>{
+      if(busy) return;
+      const r=evalTranscript(label);
+      if(r==="correct") onCorrect();
+      else if(r&&r.coach) onCoach(r.coach);
+    };
+    ui.practice.appendChild(b);
+  });
+}
+
+/* ============================================================
+   START
+   ============================================================ */
+function startGame(){
+  $("startOverlay").classList.add("hidden");
+  audio(); if(ac && ac.state==="suspended") ac.resume();
+  // unlock TTS on iOS with a tiny silent prime
+  speak("Let's play! Samurai Sword Sensei!");
+  refreshUI();
+  if(SR){ initRecognition(); }
+  else { setStatus("Tap the word you said! 👇", false); }
+  setTimeout(nextRound, 600);
+}
+
+$("startBtn").addEventListener("click", startGame);
+$("levelContinue").addEventListener("click", ()=>{
+  $("levelup").classList.add("hidden");
+  setTimeout(nextRound, 200);
+});
+
+refreshUI();
+})();
+</script>
+</body>
+</html>
