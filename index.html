@@ -148,16 +148,21 @@
   @keyframes bubblePop{ from{transform:scale(.7); opacity:0} to{transform:scale(1); opacity:1} }
 
   /* ---------- Minimal-pair cards + closeness bar ---------- */
-  #pairs{ display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin:2px 0 8px; }
+  #pairs{ display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin:2px 0 26px; }
   .pair{ background:#fff; border:3px solid #fff; border-radius:16px; padding:6px 8px 7px; width:78px;
     box-shadow:0 4px 0 rgba(52,40,90,.12); text-align:center; transition:transform .15s, border-color .2s; }
   .pair .pic{ font-size:clamp(24px,7vw,34px); line-height:1; }
   .pair .lbl{ font-size:clamp(12px,3.4vw,15px); font-weight:900; letter-spacing:1px; color:var(--ink); margin-top:2px; }
+  .pair{ position:relative; }
   .pair.goal{ border-color:var(--yellow); }
-  .pair.heard{ animation:heardPulse .9s ease; }
-  .pair.goal.heard{ animation:heardGood .9s ease; }
-  @keyframes heardPulse{ 0%{transform:scale(1); border-color:#fff} 35%{transform:scale(1.14); border-color:#ff9f43} 100%{transform:scale(1); border-color:#fff} }
-  @keyframes heardGood{ 0%{transform:scale(1); border-color:var(--yellow)} 35%{transform:scale(1.16); border-color:#51e3a0} 100%{transform:scale(1); border-color:var(--yellow)} }
+  /* lingering "you said this" highlight — orange for a sibling, green for the target */
+  .pair.said{ border-color:#ff8f1f; box-shadow:0 0 0 4px rgba(255,143,31,.5), 0 4px 0 rgba(52,40,90,.12); }
+  .pair.goal.said{ border-color:#2bbf7e; box-shadow:0 0 0 4px rgba(43,191,126,.55), 0 4px 0 rgba(52,40,90,.12); }
+  .pair.said::after{ content:"👂 you said this"; position:absolute; left:50%; bottom:-22px; transform:translateX(-50%);
+    white-space:nowrap; font-size:11px; font-weight:900; color:#b5651d; }
+  .pair.goal.said::after{ content:"⭐ you said this!"; color:#1e9e68; }
+  .pair.heard{ animation:heardPulse .55s ease; }
+  @keyframes heardPulse{ 0%{transform:scale(1)} 45%{transform:scale(1.18)} 100%{transform:scale(1)} }
   .pair .bar{ height:10px; border-radius:6px; background:#eef0f4; margin-top:6px; overflow:hidden; visibility:hidden; }
   .pair.goal .bar{ visibility:visible; }
   .pair .bar > i{ display:block; height:100%; width:0%; border-radius:6px; background:#ff6b6b;
@@ -633,11 +638,14 @@ function initRecognition(){
         const r = evalTranscript(a);
         if(r && r.coach){ flashHeard(attemptOnset(a)); onCoach(r.coach); return; }
       }
-      // otherwise: just remember she tried, and how close — stay silent
+      // otherwise: still highlight whatever it sounded most like (reinforcement),
+      // and remember she tried — but stay silent
       const hadSpeech = alts.some(a=>/[a-z]/i.test(a));
       if(hadSpeech){
         roundAttempts++;
-        if(alts.some(isAttemptClose)) lastAttemptClose = true;
+        let onset=null; for(const a of alts){ const o=attemptOnset(a); if(o){ onset=o; break; } }
+        if(onset){ flashHeard(onset); lastAttemptClose = true; }
+        else if(alts.some(isAttemptClose)) lastAttemptClose = true;
       }
     }
   };
@@ -1076,7 +1084,11 @@ function setBar(score){
 }
 function flashHeard(onset){
   if(!onset) return;
+  // clear the previous "you said this" marker, then mark + pulse the new one so
+  // the highlight LINGERS until her next attempt (clear reinforcement)
+  ui.pairs.querySelectorAll(".pair.said").forEach(c=>c.classList.remove("said"));
   const c=ui.pairs.querySelector(`.pair[data-onset="${onset}"]`); if(!c) return;
+  c.classList.add("said");
   c.classList.remove("heard"); void c.offsetWidth; c.classList.add("heard");
 }
 // which of our four sounds did she actually produce on the target word?
